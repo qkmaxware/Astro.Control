@@ -8,7 +8,7 @@
     <Authors>Colin Halseth</Authors>
     <PackageTags>astronomical</PackageTags>
     <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
-    <RepositoryUrl>https://github.com/qkmaxware/Astro.git</RepositoryUrl>
+    <RepositoryUrl>https://github.com/qkmaxware/Astro.Control.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageDescription>
       Qkmaxware.Astro.Control is a library of tools control of devices used for astronomy. It can be used separately or together with the main Qkmaxware.Astro library.

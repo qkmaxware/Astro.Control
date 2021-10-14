@@ -1,8 +1,7 @@
 # Astro.Control
-C# INDI Client Library
+C# INDI client library to interface with INDI servers. This client allows C# developers to write code to remotely control telescope and scientific equipment that is connected to an INDI server. 
 
-
-## Usage
+## Basic Usage
 1. Connect to INDI server
 ```cs
 var server = new IndiServer("localhost");
