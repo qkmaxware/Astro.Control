@@ -1,0 +1,30 @@
+name: Test Packages
+on:
+  push: 
+    branches: 
+    - "*"
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy: 
+      fail-fast: false
+      matrix: 
+        os: [ ubuntu-latest, macOS-latest ]
+        dotnet: [ '5.0.x' ]
+    steps:
+    - name: Checkout Code - ${{ github.sha }}@${{ github.ref }}
+      uses: actions/checkout@master
+    - name: Setup .NET Core - ${{ matrix.dotnet }}@${{ matrix.os }}
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '${{ matrix.dotnet }}'
+    - name: .Net Core Info
+      run: dotnet --info
+    - name: Restore Packages
+      env: 
+        GITHUB_USERNAME: qkmaxware
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: dotnet restore --configfile nuget.config
+    - name: Run Unit Tests
+      run: dotnet test

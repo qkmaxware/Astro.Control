@@ -1,0 +1,8 @@
+bin/
+obj/
+nupkg/
+.vscode/
+*.log
+
+# Ignore this until it is ready to go
+Qkmaxware.Astro.Apps.Observatory
