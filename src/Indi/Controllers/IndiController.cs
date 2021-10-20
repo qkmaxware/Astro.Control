@@ -10,55 +10,57 @@ public abstract class IndiDeviceController {
 
     private IndiDevice device;
 
+    /// <summary>
+    /// Create a controller around this given device
+    /// </summary>
+    /// <param name="device">device</param>
     public IndiDeviceController(IndiDevice device) {
         this.device = device;
     }
 
+    /// <summary>
+    /// Get a value or throw an exception
+    /// </summary>
+    /// <param name="prop">propety to get</param>
+    /// <typeparam name="T">property value's type to cast</typeparam>
+    /// <returns>property if the property exists and is of the given type</returns>
     protected T GetProperty<T>(string prop) where T:IndiValue, new() {
-        if (device.Properties.HasProperty(prop)) {
-            var t = device.Properties[prop];
-            if (t is T) {
-                return (T)device.Properties[prop];
-            } else {
-                throw new System.ArgumentException($"Device property '{prop}' is not of type {typeof(T).Name}");
-            }
+        T value = default(T);
+        if (device.Properties.TryGet<T>(prop, out value)) {
+            return value;
         } else {
-            throw new System.ArgumentException($"Device is missing required property '{prop}'");
+            throw new System.ArgumentException($"Device property '{prop}' is missing or not of type {typeof(T).Name}");
         }
     }
 
+    /// <summary>
+    /// Change the value of a property
+    /// </summary>
+    /// <param name="property">property to change</param>
+    /// <param name="vector">value to change it to</param>
     protected void SetProperty(string property, IndiValue vector) {
-        this.device.ChangeRemoteProperty(property, vector);
+        this.device.Properties.SetAsync(property, vector);
     }
 
+    /// <summary>
+    /// Refresh all properties
+    /// </summary>
     public void RefreshProperties() {
-        this.device.RefreshProperties();
+        this.device.Properties.RefreshAsync();
     }
 
+    /// <summary>
+    /// Connect the underlying device if not connected
+    /// </summary>
     public void Connect() {
-        IndiVector<IndiSwitchValue> vector = GetProperty<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection);
-        var connect = vector.GetSwitch("CONNECT");
-        if (connect != null && !connect.IsOn) {
-            // Only connect if not already connected
-            foreach (var toggle in vector) {
-                toggle.Value = toggle == connect;
-            }
-            this.device.ChangeRemoteProperty(vector.Name, vector);
-            this.device.RefreshProperties();
-        }
+        this.device.Connect();
     }
 
+    /// <summary>
+    /// Disconnect the underlying device
+    /// </summary>
     public void Disconnect() {
-        IndiVector<IndiSwitchValue> vector = GetProperty<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection);
-        var disconnect = vector.GetSwitch("CONNECT");
-        if (disconnect != null && !disconnect.IsOn) {
-            // Only disconnect if not already disconnected
-            foreach (var toggle in vector) {
-                toggle.Value = toggle == disconnect;
-            }
-            this.device.ChangeRemoteProperty(vector.Name, vector);
-            this.device.RefreshProperties();
-        }
+        this.device.Disconnect();
     }
 
 }

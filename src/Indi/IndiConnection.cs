@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Sockets;
@@ -14,73 +15,89 @@ using System.Threading;
 namespace Qkmaxware.Astro.Control {
 
 /// <summary>
-/// INDI server information
+/// A thread safe collection of indi devices
 /// </summary>
-public class IndiServer {
+public class ThreadsafeDeviceCollection: ConcurrentDictionary<string, IndiDevice> {
     /// <summary>
-    /// Default port used by INDI servers
+    /// All devices on this server
     /// </summary>
-    public static readonly int DefaultPort = 7624;
-    /// <summary>
-    /// Server host ip
-    /// </summary>
-    /// <value>host</value>
-    public string Host {get; private set;}
-    /// <summary>
-    /// Server port
-    /// </summary>
-    /// <value>port number</value>
-    public int Port {get; private set;}
-
-    /// <summary>
-    /// Create a new reference to an INDI server
-    /// </summary>
-    /// <param name="host">host string</param>
-    /// <param name="port">port</param>
-    public IndiServer(string host, int port = 7624) {
-        this.Host = host;
-        this.Port = port;
+    /// <returns>list of devices</returns>
+    public IEnumerable<IndiDevice> AllDevices() {
+        return this.Values;
     }
 
     /// <summary>
-    /// Try to establish a connection to the INDI server
+    /// All devices currently with an established connection
     /// </summary>
-    /// <param name="conn">connection if successful</param>
-    /// <returns>true if connection was successful, false otherwise</returns>
-    public bool TryConnect(out IndiConnection conn) {
-        return TryConnect(out conn, new IIndiListener[0]);
+    /// <returns>list of devices</returns>
+    public IEnumerable<IndiDevice> ConnectedDevices() {
+        return this.AllDevices().Where(device => device.IsConnected());
     }
 
     /// <summary>
-    /// Try to establish a connection to the INDI server
+    /// All devices currently without an established connection
     /// </summary>
-    /// <param name="conn">connection if successful</param>
-    /// <param name="listeners">list of INDI listeners to automatically subscribe to the connection if successful</param>
-    /// <returns>true if connection was successful, false otherwise</returns>
-    public bool TryConnect(out IndiConnection conn, params IIndiListener[] listeners) {
-        conn = new IndiConnection(this);
-        foreach (var listener in listeners) {
-            conn.Subscribe(listener);
-        }
-        conn.ReConnect();
-        if (conn.IsConnected) {
-            return true;
-        } else {
-            conn.Disconnect();
-            conn = null;
-            return false;
-        }
+    /// <returns>list of devices</returns>
+    public IEnumerable<IndiDevice> DisconnectedDevices() {
+        return this.AllDevices().Where(device => !device.IsConnected());
+    }
+
+    /// <summary>
+    /// All telescopes on this server as identified by the INDI property "TELESCOPE_INFO" 
+    /// </summary>
+    /// <returns>list of devices</returns>
+    public IEnumerable<IndiDevice> AllTelescopes() {
+        return AllDevices().Where((d) => d.Properties.Exists("TELESCOPE_INFO"));
+    }
+
+    /// <summary>
+    /// All CCD devices on this server as identified by the INDI property "CCD_INFO" 
+    /// </summary>
+    /// <returns>list of devices</returns>
+    public IEnumerable<IndiDevice> AllCCDs() {
+        return AllDevices().Where((d) => d.Properties.Exists("CCD_INFO"));
+    }
+
+    /// <summary>
+    /// All filter wheel devices on this server as identified by the INDI property "FILTER_SLOT" 
+    /// </summary>
+    /// <returns>list of devices</returns>
+    public IEnumerable<IndiDevice> AllFilterWheels() {
+        return AllDevices().Where((d) => d.Properties.Exists("FILTER_SLOT"));
+    }
+
+    /// <summary>
+    /// All focuser devices on this server as identified by the INDI property "FOCUS_MOTION" 
+    /// </summary>
+    /// <returns>list of devices</returns>
+    public IEnumerable<IndiDevice> AllFocusers() {
+        return AllDevices().Where((d) => d.Properties.Exists("FOCUS_MOTION"));
+    }
+
+    /// <summary>
+    /// All observation domes on this server as identified by the INDI property "DOME_MEASUREMENTS" 
+    /// </summary>
+    /// <returns>list of devices</returns>
+    public IEnumerable<IndiDevice> AllDomes() {
+        return AllDevices().Where((d) => d.Properties.Exists("DOME_MEASUREMENTS"));
     }
 }
+
 
 /// <summary>
 /// Connection from client machine to INDI server
 /// </summary>
-public class IndiConnection : Notifier<IIndiListener> {
+public class IndiConnection {
     private IndiServer server;
     private TcpClient client;
     private StreamReader reader;
     private StreamWriter writer;
+
+    /// <summary>
+    /// Flag to indicate if disconnected devices should be connected automatically when discovered
+    /// </summary>
+    /// <value>true to auto connect devices</value>
+    public bool AutoConnectDevices {get; set;}
 
     /// <summary>
     /// Output stream to print all received messages to
@@ -98,11 +115,18 @@ public class IndiConnection : Notifier<IIndiListener> {
     /// <typeparam name="string">device name</typeparam>
     /// <typeparam name="IndiDevice">device</typeparam>
     /// <returns>all devices</returns>
-    public ConcurrentDictionary<string, IndiDevice> Devices {get; private set;} = new ConcurrentDictionary<string, IndiDevice>();
+    public ThreadsafeDeviceCollection Devices {get; private set;} = new ThreadsafeDeviceCollection();
 
-    internal IndiConnection (IndiServer server) {
+    /// <summary>
+    /// Event dispatcher which can have its events subscribed to by listeners
+    /// </summary>
+    /// <value>event dispatcher</value>
+    public IndiConnectionEventDispatcher Events {get; private set;}
+
+    internal IndiConnection (IndiServer server, IndiConnectionEventDispatcher eventDispatcher = null) {
         var builder = new UriBuilder();
         this.server = server;
+        this.Events = eventDispatcher ?? new IndiConnectionEventDispatcher();
     }
 
     ~IndiConnection() {
@@ -115,9 +139,7 @@ public class IndiConnection : Notifier<IIndiListener> {
     /// <param name="device">device</param>
     public void AddDevice(IndiDevice device) {
         this.Devices.AddOrUpdate(device.Name, device, (key, old) => device);
-        foreach (var sub in this.Subscribers) {
-            sub.OnAddDevice(device);
-        }
+        this.Events.NotifyDeviceFound(device);
     }
 
     /// <summary>
@@ -126,9 +148,8 @@ public class IndiConnection : Notifier<IIndiListener> {
     /// <param name="device">device</param>
     public void RemoveDevice(IndiDevice device) {
         IndiDevice deleted;
-        this.Devices.TryRemove(device.Name, out deleted);
-        foreach (var sub in this.Subscribers) {
-            sub.OnRemoveDevice(deleted);
+        if(this.Devices.TryRemove(device.Name, out deleted)) {
+            this.Events.NotifyDeviceFound(deleted);
         }
     }
 
@@ -163,9 +184,7 @@ public class IndiConnection : Notifier<IIndiListener> {
         int b4 = Devices.Count;
         var device = Devices.GetOrAdd(name, new IndiDevice(name, this));
         if (Devices.Count > b4) {
-            foreach (var sub in this.Subscribers) {
-                sub.OnAddDevice(device);
-            }
+            this.Events.NotifyDeviceFound(device);
         }
         return device;
     }
@@ -191,9 +210,7 @@ public class IndiConnection : Notifier<IIndiListener> {
 
                     Task.Run(asyncRead);
 
-                    foreach (var sub in this.Subscribers) {
-                        sub.OnConnect(this.server);
-                    }
+                    this.Events.NotifyServerConnected();
                 }
             } catch {
                 Disconnect();
@@ -209,9 +226,7 @@ public class IndiConnection : Notifier<IIndiListener> {
         client = null;
         reader = null;
         writer = null;
-        foreach (var sub in this.Subscribers) {
-            sub.OnDisconnect(this.server);
-        }
+        this.Events.NotifyServerDisconnected();
     }
 
     /// <summary>
@@ -220,27 +235,70 @@ public class IndiConnection : Notifier<IIndiListener> {
     /// <param name="message">message to send</param>
     public void Send(IndiClientMessage message) {
         this.SendXml(message.EncodeXml());
-        foreach (var sub in this.Subscribers) {
-            sub.OnMessageSent(message);
-        }
+        this.Events.NotifyMessageSent(message);
     }
 
     /// <summary>
     /// Receive a message from the server
     /// </summary>
     /// <param name="message">received message</param>
-    public void Receive(IndiDeviceMessage message) {
-        // actually do the correct action based on the message
-        // adding devices or updating properties etc
-        // allow blockers to continue
+    public void Receive(IndiServerMessage message) {
         if (message != null) {
+            // Handle events listening to messages
+            // Dispatch different events based on the message type
             try {
-                message.Process(this);
-                foreach (var sub in this.Subscribers) {
-                    sub.OnMessageReceived(message);
-                }
+                // Generic notification of the message
+                this.Events.NotifyMessageReceived(message);
+                
+                // Specific notification based on message type
+                switch (message) {
+                    case IndiSetPropertyMessage smsg: {
+                        var device = this.GetDeviceByName(smsg.DeviceName);
+                        this.Events.NotifyPropertyChanged(
+                            device, 
+                            smsg.PropertyName,
+                            device.Properties.Get(smsg.PropertyName),
+                            smsg.PropertyValue
+                        );
+                        break;
+                    }
+                    case IndiDefinePropertyMessage dmsg: {
+                        var device = this.GetDeviceByName(dmsg.DeviceName);
+                        this.Events.NotifyPropertyCreated(device, dmsg.PropertyName, dmsg.PropertyValue);
+                        break;   
+                    }
+                    case IndiDeletePropertyMessage delmsg: {
+                        var device = this.GetDeviceByName(delmsg.DeviceName);
+                        this.Events.NotifyPropertyDeleted(device, delmsg.PropertyName, device.Properties.Get(delmsg.PropertyName));
+                        break; 
+                    }
+                    case IndiNotificationMessage note: {
+                        this.Events.Notify(note.Message);
+                        break;
+                    }
+                }   
             } catch {
                 // Suppress all errors for handlers
+            }
+
+            // actually do the correct action based on the message
+            // adding devices or updating properties etc
+            // allow blockers to continue
+            try {
+                message.Process(this);
+            } catch {
+                // Suppress all errors processing errors
+            }
+
+            // TODO finish this off
+            // If the auto connect flag is set and we are defining a connection property
+            if (message is IndiDefinePropertyMessage propDef) {
+                if (this.AutoConnectDevices && !string.IsNullOrEmpty(propDef.DeviceName) && propDef.PropertyName == IndiStandardProperties.Connection) {
+                    IndiDevice device;
+                    if(this.Devices.TryGetValue(propDef.DeviceName, out device)) {
+                        device.Connect();
+                    }
+                }
             }
         }
     }

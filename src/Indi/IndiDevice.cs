@@ -18,17 +18,83 @@ namespace Qkmaxware.Astro.Control {
 public class IndiPropertiesContainer : IEnumerable<KeyValuePair<string, IndiValue>>{
     private ConcurrentDictionary<string, IndiValue> properties = new ConcurrentDictionary<string, IndiValue>();
 
-    public IndiPropertiesContainer() {}
+    private IndiDevice owner;
+
+    public IndiPropertiesContainer(IndiDevice owner) {
+        this.owner = owner;
+    }
 
     /// <summary>
     /// Check if the given property exists
     /// </summary>
     /// <param name="name">property name</param>
     /// <returns>true if property exists</returns>
-    public bool HasProperty(string name) {
+    public bool Exists(string name) {
         return properties.ContainsKey(name);
     }
 
+    /// <summary>
+    /// Request that all properties be refreshed asynchronously
+    /// </summary>
+    public void RefreshAsync() {
+        this.owner.Connection.Send(new IndiGetPropertiesMessage(this.owner.Name));
+    }
+
+    /// <summary>
+    /// Request that a specific property be refreshed asynchronously
+    /// </summary>
+    /// <param name="property">name of the property to refresh</param>
+    public void RefreshAsync(string property) {
+        this.owner.Connection.Send(new IndiGetPropertiesMessage(this.owner.Name));
+    }
+
+    /// <summary>
+    /// Set the value of a property, sending the change to the INDI server asynconously. It may take a few moments to be updated locally.
+    /// </summary>
+    /// <param name="property">name of the property to change</param>
+    /// <param name="value">value to change the property to</param>
+    public void SetAsync(string property, IndiValue value) {
+        // Create NewProperty client message
+        // Populate device name, property name, and value
+        var message = new IndiNewPropertyMessage(this.owner.Name, property, value);
+        // Update local copy
+        // this.Properties[name] = value; 
+        // Encode and send
+        this.owner.Connection.Send(message);
+        //RefreshProperty(name);
+    }
+
+    /// <summary>
+    /// Get the cached local value of the given property
+    /// </summary>
+    /// <param name="property">property whose value to get</param>
+    /// <returns>value of the given property if it exists</returns>
+    public IndiValue Get(string property) {
+        return this.properties[property];
+    }
+
+    /// <summary>
+    /// Get the cached local value of a given property only if it exists and if of the given type
+    /// </summary>
+    /// <param name="property">property whose value to get</param>
+    /// <param name="value">value of the given property if it exists</param>
+    /// <typeparam name="T">type assertion for the type of the property's value</typeparam>
+    /// <returns>true if property exists and is of the given type</returns>
+    public bool TryGet<T> (string property, out T value) where T:IndiValue {
+        value = default(T);
+        if (this.Exists(property)) {
+            var t = this.Get(property);
+            if (t is T) {
+                value = (T)this.Get(property);
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+ 
     /// <summary>
     /// Clear all properties
     /// </summary>
@@ -66,7 +132,7 @@ public class IndiPropertiesContainer : IEnumerable<KeyValuePair<string, IndiValu
     /// </summary>
     /// <value>property value</value>
     public IndiValue this[string key] {
-        get => properties[key];
+        get => Get(key);
         internal set => properties[key] = value;
     }
 }
@@ -75,7 +141,6 @@ public class IndiPropertiesContainer : IEnumerable<KeyValuePair<string, IndiValu
 /// Abstraction for a device accessible over an INDI connection
 /// </summary>
 public class IndiDevice {
-    private IndiConnection conn;
     /// <summary>
     /// Name of the device
     /// </summary>
@@ -85,7 +150,12 @@ public class IndiDevice {
     /// Properties associated with this device
     /// </summary>
     /// <returns>property container</returns>
-    public IndiPropertiesContainer Properties {get; private set;} = new IndiPropertiesContainer();
+    public IndiPropertiesContainer Properties {get; private set;}
+
+    /// <summary>
+    /// The connection this device can be accessed over
+    /// </summary>
+    public IndiConnection Connection {get; private set;}
 
     /// <summary>
     /// Create a new device on the given connection with the given name
@@ -94,40 +164,54 @@ public class IndiDevice {
     /// <param name="connection">connection the device is accessible over</param>
     public IndiDevice(string name, IndiConnection connection) {
         this.Name = name;
-        this.conn = connection;
+        this.Connection = connection;
+        this.Properties = new IndiPropertiesContainer(this);
+    }
+
+    public bool IsConnected() {
+        IndiVector<IndiSwitchValue> vector;
+        if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
+            return vector.GetSwitch("CONNECT")?.IsOn ?? false;
+        } else {
+            return false;
+        }
+    }
+
+
+    /// <summary>
+    /// Connect the device, this may trigger more properties to be pulled from the server
+    /// </summary>
+    public void Connect() {
+        IndiVector<IndiSwitchValue> vector;
+        if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
+            var connect = vector.GetSwitch("CONNECT");
+            if (connect != null && !connect.IsOn) {
+                // Only connect if not already connected
+                foreach (var toggle in vector) {
+                    toggle.Value = toggle == connect;
+                }
+                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.RefreshAsync();
+            }
+        }
     }
 
     /// <summary>
-    /// Send a request to update a partiular device property
+    /// Disconnect the device
     /// </summary>
-    /// <param name="property">property name</param>
-    public void RefreshProperty(string property) {
-        // Send a request to get the properties for this device
-        this.conn.Send(new IndiGetPropertiesMessage(this.Name, property));
-    }
-
-    /// <summary>
-    /// Send a request to update all device properties
-    /// </summary>
-    public void RefreshProperties() {
-        // Send a request to get the properties for this device
-        this.conn.Send(new IndiGetPropertiesMessage(this.Name));
-    }
-
-    /// <summary>
-    /// Send a request to the INDI server to change the value of a property
-    /// </summary>
-    /// <param name="name">property name</param>
-    /// <param name="value">new property value</param>
-    public void ChangeRemoteProperty(string name, IndiValue value) {
-        // Create NewProperty client message
-        // Populate device name, property name, and value
-        var message = new IndiNewPropertyMessage(this.Name, name, value);
-        // Update local copy
-        // this.Properties[name] = value; 
-        // Encode and send
-        conn.Send(message);
-        //RefreshProperty(name);
+    public void Disconnect() {
+        IndiVector<IndiSwitchValue> vector;
+        if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
+            var disconnect = vector.GetSwitch("CONNECT");
+            if (disconnect != null && !disconnect.IsOn) {
+                // Only disconnect if not already disconnected
+                foreach (var toggle in vector) {
+                    toggle.Value = toggle == disconnect;
+                }
+                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.RefreshAsync();
+            }
+        }
     }
 }   
 

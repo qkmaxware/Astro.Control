@@ -12,9 +12,9 @@ using System.Collections.Generic;
 namespace Qkmaxware.Astro.Control {
 
 /// <summary>
-/// Messages from the device to the client
+/// Messages from the server to the client
 /// </summary>
-public abstract class IndiDeviceMessage {
+public abstract class IndiServerMessage {
     /// <summary>
     /// Action to perform when the message is received
     /// </summary>
@@ -28,9 +28,9 @@ public abstract class IndiDeviceMessage {
 }
 
 /// <summary>
-/// Set a property on the client
+/// Set a property on the client with value from the server
 /// </summary>
-public class IndiSetPropertyMessage : IndiDeviceMessage {
+public class IndiSetPropertyMessage : IndiServerMessage {
     /// <summary>
     /// Device name
     /// </summary>
@@ -81,7 +81,7 @@ public class IndiSetPropertyMessage : IndiDeviceMessage {
 
     private void updateProperty(IndiDevice device, string property, IndiValue value) {
         // TODO, fix this to not overwrite values, but just to update the actual "stored" value
-        if (device.Properties.HasProperty(PropertyName)) {
+        if (device.Properties.Exists(PropertyName)) {
             var oldProp = device.Properties[property];
             if (oldProp is UpdatableIndiValue updatableProp) {
                 if (!updatableProp.TryUpdateValue(value)) {
@@ -101,9 +101,9 @@ public class IndiSetPropertyMessage : IndiDeviceMessage {
 }
 
 /// <summary>
-/// Define the given property on the client
+/// Define the given property on the client from a definition on the server
 /// </summary>
-public class IndiDefinePropertyMessage : IndiDeviceMessage {
+public class IndiDefinePropertyMessage : IndiServerMessage {
     /// <summary>
     /// Device name
     /// </summary>
@@ -147,9 +147,9 @@ public class IndiDefinePropertyMessage : IndiDeviceMessage {
 }
 
 /// <summary>
-/// Delete a given property
+/// Delete a given property on the client that was removed on the server
 /// </summary>
-public class IndiDeletePropertyMessage : IndiDeviceMessage {
+public class IndiDeletePropertyMessage : IndiServerMessage {
     /// <summary>
     /// Device name
     /// </summary>
@@ -235,9 +235,9 @@ public class IndiDeletePropertyMessage : IndiDeviceMessage {
 }
 
 /// <summary>
-/// Generic notification message
+/// Generic notification message from the server to the client
 /// </summary>
-public class IndiNotificationMessage : IndiDeviceMessage {
+public class IndiNotificationMessage : IndiServerMessage {
     /// <summary>
     /// Device name notification came from
     /// </summary>

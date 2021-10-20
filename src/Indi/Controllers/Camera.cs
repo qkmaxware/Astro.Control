@@ -7,6 +7,9 @@ namespace Qkmaxware.Astro.Control.Controllers {
 
 using IndiSwitchVector = IndiVector<IndiSwitchValue>;
 
+/// <summary>
+/// Controller abstraction for CCD devices
+/// </summary>
 public class IndiCameraController : IndiDeviceController {
     public IndiCameraController(IndiDevice device) : base(device) {}
 

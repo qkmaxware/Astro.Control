@@ -12,7 +12,7 @@ public enum Direction {
 }
 
 /// <summary>
-/// Controller to slew a GOTO telescope mount
+/// Controller abstraction for telescope devices
 /// </summary>
 public class IndiTelescopeController : IndiDeviceController {
     public bool IsPositioned {get; private set;}
