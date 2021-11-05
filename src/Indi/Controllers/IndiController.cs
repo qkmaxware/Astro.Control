@@ -9,6 +9,10 @@ namespace Qkmaxware.Astro.Control.Controllers {
 public abstract class IndiDeviceController {
 
     private IndiDevice device;
+    /// <summary>
+    /// Name of the controlled INDI device
+    /// </summary>
+    public string DeviceName => device.Name;
 
     /// <summary>
     /// Create a controller around this given device
@@ -16,6 +20,15 @@ public abstract class IndiDeviceController {
     /// <param name="device">device</param>
     public IndiDeviceController(IndiDevice device) {
         this.device = device;
+    }
+
+    /// <summary>
+    /// Test if the device has the given property. Useful un verifying if the device is compatible with the controller.
+    /// </summary>
+    /// <param name="name">name of the property</param>
+    /// <returns>true if the device has a property with the given name</returns>
+    protected bool HasProperty(string name) {
+        return this.device != null && this.device.Properties != null && this.device.Properties.Exists(name);
     }
 
     /// <summary>
@@ -43,11 +56,24 @@ public abstract class IndiDeviceController {
     }
 
     /// <summary>
+    /// Send a generic message to this INDI device
+    /// </summary>
+    /// <param name="message">device message</param>
+    protected void SendMessageToDevice(IndiClientMessage message) {
+        this.device.Connection.Send(message);
+    }
+
+    /// <summary>
     /// Refresh all properties
     /// </summary>
     public void RefreshProperties() {
         this.device.Properties.RefreshAsync();
     }
+
+    /// <summary>
+    /// Check if the underlying device is connected or not
+    /// </summary>
+    public bool IsConnected() => this.device.IsConnected();
 
     /// <summary>
     /// Connect the underlying device if not connected
@@ -61,6 +87,23 @@ public abstract class IndiDeviceController {
     /// </summary>
     public void Disconnect() {
         this.device.Disconnect();
+    }
+
+    /// <summary>
+    /// Set the device's time to the current time on the client system
+    /// </summary>
+    public void SetTimeFromClient() {
+        this.device.SetClock(DateTime.Now);
+    }
+
+    /// <summary>
+    /// Set the device's geographic location
+    /// </summary>
+    /// <param name="lat">latitude in degrees +N</param>
+    /// <param name="lon">longitude in degrees +E</param>
+    /// <param name="alt">altitude in meters</param>
+    public void SetGeolocation(double lat, double lon, double alt = 0) {
+        this.device.SetGeolocation(lat, lon, alt);
     }
 
 }

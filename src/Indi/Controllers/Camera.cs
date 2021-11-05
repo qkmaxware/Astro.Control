@@ -34,6 +34,15 @@ public class IndiCameraController : IndiDeviceController {
         SetProperty(property, vector);
     }
 
+    public void EnableReceivingImageBlobs(IndiBlobState state = IndiBlobState.Also) {
+        var message = new IndiEnableBlobMessage {
+            DeviceName = this.DeviceName,
+            PropertyName = "CCD1",
+            State = state
+        };
+        this.SendMessageToDevice(message);
+    }
+
     public void ExposeSync(float seconds) {
         var property = "CCD_EXPOSURE";
         SetProperty(property, new IndiNumberValue { Name = "CCD_EXPOSURE_VALUE", Value = seconds });

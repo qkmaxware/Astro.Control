@@ -58,10 +58,9 @@ public class IndiPropertiesContainer : IEnumerable<KeyValuePair<string, IndiValu
         // Populate device name, property name, and value
         var message = new IndiNewPropertyMessage(this.owner.Name, property, value);
         // Update local copy
-        // this.Properties[name] = value; 
+        this.properties[property] = value; 
         // Encode and send
         this.owner.Connection.Send(message);
-        //RefreshProperty(name);
     }
 
     /// <summary>
@@ -168,6 +167,10 @@ public class IndiDevice {
         this.Properties = new IndiPropertiesContainer(this);
     }
 
+    /// <summary>
+    /// Test if this device is connected
+    /// </summary>
+    /// <returns>true if the device is connected</returns>
     public bool IsConnected() {
         IndiVector<IndiSwitchValue> vector;
         if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
@@ -176,7 +179,6 @@ public class IndiDevice {
             return false;
         }
     }
-
 
     /// <summary>
     /// Connect the device, this may trigger more properties to be pulled from the server
@@ -213,6 +215,48 @@ public class IndiDevice {
             }
         }
     }
+
+    #region Standard Property Manipulators
+
+    /// <summary>
+    /// Set the device's clock
+    /// </summary>
+    public void SetClock(DateTime time) {
+        IndiVector<IndiTextValue> vector;
+        if (this.Properties.TryGet<IndiVector<IndiTextValue>>(IndiStandardProperties.Connection, out vector)) {
+            if (vector.IsWritable) {
+                vector.GetItemWithName("UTC").Value = time.ToUniversalTime().ToString("o");
+                vector.GetItemWithName("OFFSET").Value = TimeZoneInfo.Local.GetUtcOffset(time).TotalHours.ToString();
+                
+                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.RefreshAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Set the device's geographic location
+    /// </summary>
+    /// <param name="lat">latitude in degrees +N</param>
+    /// <param name="lon">longitude in degrees +E</param>
+    /// <param name="alt">altitude in meters</param>
+    public void SetGeolocation(double lat, double lon, double alt = 0) {
+        lat = Math.Min(90, Math.Max(-90, lat)); //clamp between -90 and 90
+        lon = (lon - (Math.Floor( lon / 360 ) * 360 )) + 0; // normalize between 0 and 360
+        IndiVector<IndiNumberValue> vector;
+        if (this.Properties.TryGet<IndiVector<IndiNumberValue>>(IndiStandardProperties.Connection, out vector)) {
+            if (vector.IsWritable) {
+                vector.GetItemWithName("LAT").Value = lat;
+                vector.GetItemWithName("LONG").Value = lon;
+                vector.GetItemWithName("ELEV").Value = Math.Max(0, alt);
+
+                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.RefreshAsync();
+            }
+        }
+    }
+
+    #endregion
 }   
 
 }

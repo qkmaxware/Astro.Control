@@ -185,18 +185,32 @@ public class IndiLightValue : IndiValue {
 }
 
 /// <summary>
-/// INDI BLOB value
+/// INDI BLOB value stored as a base64 string
 /// </summary>
 public class IndiBlobValue : IndiValue<string> {
-    public byte[] Blob => System.Text.Encoding.ASCII.GetBytes(this.Value);
+    public byte[] Blob => Convert.FromBase64String(this.Value);
     public override string IndiTypeName => "BLOB";
     public IndiBlobValue() {}
     public IndiBlobValue(FileStream fs) {
         using (BinaryReader reader = new BinaryReader(fs)) {
             byte[] blob = reader.ReadBytes((int)fs.Length);
-            this.Value = System.Text.Encoding.ASCII.GetString(blob);
+            this.Value = Convert.ToBase64String(blob);
         }
     }
+
+    /// <summary>
+    /// Create a file from this blob data's binary data
+    /// </summary>
+    /// <param name="path">path of file</param>
+    public void WriteBlobToFile(string path) {
+        if (!string.IsNullOrEmpty(this.Value)) {
+            using (var filestream = File.Open(path, FileMode.Create))
+            using (var writer = new BinaryWriter(filestream)) {
+                writer.Write(this.Blob);
+            }
+        }
+    }
+
     internal override XElement CreateElement(string prefix, string subPrefix) {
         var node = new XElement(
             prefix + IndiTypeName, 
@@ -388,17 +402,18 @@ public class IndiVector<T> : UpdatableIndiValue, IList<T> where T:IndiValue {
         var parent = new XElement(
             prefix + IndiTypeName
         );
-        if (this.Name != null)
+        if (!string.IsNullOrEmpty(this.Name))
             parent.Add(new XAttribute("name", this.Name));
-        if (this.Label != null)
+        if (!string.IsNullOrEmpty(this.Label))
             parent.Add(new XAttribute("label", this.Label));
-        if (this.Group != null)
+        if (!string.IsNullOrEmpty(this.Group))
             parent.Add(new XAttribute("group", this.Group));
-        if (this.State != null)
+        // Don't need these for setting
+        if (!string.IsNullOrEmpty(this.State))
             parent.Add(new XAttribute("state", this.State));
-        if (this.Permissions != null)
+        if (!string.IsNullOrEmpty(this.Permissions))
             parent.Add(new XAttribute("perm", this.Permissions));
-        if (this.Rule != null)
+        if (!string.IsNullOrEmpty(this.Rule))
             parent.Add(new XAttribute("rule", this.Rule));
 
         foreach (var child in this.vector) {

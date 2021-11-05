@@ -103,4 +103,53 @@ public class IndiNewPropertyMessage : IndiClientMessage {
     }
 }
 
+/// <summary>
+/// The state of blob sending 
+/// </summary>
+public enum IndiBlobState {
+    /// <summary>
+    /// Never receive BLOBs on this connection
+    /// </summary>
+    Never, 
+    /// <summary>
+    /// Only receive BLOBs on this connection, pauses changes to other properties
+    /// </summary>
+    Only, 
+    /// <summary>
+    /// Receive BLOBs on this connection as well as changes to other properties
+    /// </summary>
+    Also
+}
+
+/// <summary>
+/// Message sent to control the state of sending or recieving BLOBs
+/// </summary>
+public class IndiEnableBlobMessage : IndiClientMessage {
+    /// <summary>
+    /// Device name
+    /// </summary>
+    public string DeviceName;
+    /// <summary>
+    /// Property name
+    /// </summary>
+    public string PropertyName;
+    /// <summary>
+    /// State of blob handling for this property
+    /// </summary>
+    public IndiBlobState State; 
+    public override string EncodeXml() {
+        var node = new XElement(
+            "enableBLOB", 
+            new XText(this.State.ToString())
+        );
+        if (this.DeviceName != null) {
+            node.Add(new XAttribute("device", this.DeviceName));
+        }
+        if (this.PropertyName != null) {
+            node.Add(new XAttribute("name", this.PropertyName));
+        }
+        return node.ToString();
+    }
+}
+
 }

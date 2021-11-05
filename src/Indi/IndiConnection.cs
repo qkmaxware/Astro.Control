@@ -18,6 +18,35 @@ namespace Qkmaxware.Astro.Control {
 /// A thread safe collection of indi devices
 /// </summary>
 public class ThreadsafeDeviceCollection: ConcurrentDictionary<string, IndiDevice> {
+
+    /// <summary>
+    /// Fetch a device with the given name or null if the device does not exist
+    /// </summary>
+    /// <param name="name">device name</param>
+    /// <returns>device or null if no device with the given name exists</returns>
+    public IndiDevice GetDeviceByNameOrNull(string name) {
+        IndiDevice device;
+        if (this.TryGetValue(name, out device)) {
+            return device;
+        } else {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Fetch a device with the given name or throw exception
+    /// </summary>
+    /// <param name="name">device name</param>
+    /// <returns>device</returns>
+    public IndiDevice GetDeviceByNameOrThrow(string name) {
+        IndiDevice device;
+        if (this.TryGetValue(name, out device)) {
+            return device;
+        } else {
+            throw new ArgumentException($"Device '{name}' not found over this connection");
+        }
+    }
+
     /// <summary>
     /// All devices on this server
     /// </summary>
@@ -88,9 +117,13 @@ public class ThreadsafeDeviceCollection: ConcurrentDictionary<string, IndiDevice
 /// Connection from client machine to INDI server
 /// </summary>
 public class IndiConnection {
-    private IndiServer server;
+    /// <summary>
+    /// The server that this connection is established to
+    /// </summary>
+    /// <value>connected server</value>
+    public IndiServer Server {get; private set;}
     private TcpClient client;
-    private StreamReader reader;
+    private Stream inputStream;
     private StreamWriter writer;
 
     /// <summary>
@@ -102,7 +135,7 @@ public class IndiConnection {
     /// <summary>
     /// Output stream to print all received messages to
     /// </summary>
-    public StreamWriter OutputStream;
+    public TextWriter OutputStream;
 
     /// <summary>
     /// Check if the connection is active
@@ -125,7 +158,7 @@ public class IndiConnection {
 
     internal IndiConnection (IndiServer server, IndiConnectionEventDispatcher eventDispatcher = null) {
         var builder = new UriBuilder();
-        this.server = server;
+        this.Server = server;
         this.Events = eventDispatcher ?? new IndiConnectionEventDispatcher();
     }
 
@@ -167,6 +200,9 @@ public class IndiConnection {
     /// <param name="name">name of device</param>
     /// <returns>device or null</returns>
     public IndiDevice GetDeviceByName(string name) {
+        if (string.IsNullOrEmpty(name))
+            return null;
+        
         IndiDevice device;
         if (Devices.TryGetValue(name, out device)) {
             return device;
@@ -202,10 +238,10 @@ public class IndiConnection {
     public void ReConnect() {
         if (!IsConnected) {
             try {
-                client = new TcpClient(server.Host, server.Port);
+                client = new TcpClient(Server.Host, Server.Port);
                 if (IsConnected) {
                     NetworkStream stream = client.GetStream();
-                    reader = new StreamReader(stream, Encoding.UTF8);
+                    inputStream =  stream;
                     writer = new StreamWriter(stream, Encoding.UTF8);
 
                     Task.Run(asyncRead);
@@ -224,7 +260,7 @@ public class IndiConnection {
     public void Disconnect() {
         client?.Close();
         client = null;
-        reader = null;
+        inputStream = null;
         writer = null;
         this.Events.NotifyServerDisconnected();
     }
@@ -239,14 +275,20 @@ public class IndiConnection {
     }
 
     /// <summary>
-    /// Receive a message from the server
+    /// Process a message from the server
     /// </summary>
     /// <param name="message">received message</param>
-    public void Receive(IndiServerMessage message) {
+    public void Process(IndiServerMessage message) {
         if (message != null) {
             // Handle events listening to messages
             // Dispatch different events based on the message type
             try {
+                // In case of change events, store a reference to the old value before doing the update
+                IndiValue old = message is IndiSetPropertyMessage setter ? this.GetDeviceByName(setter.DeviceName)?.Properties?.Get(setter.PropertyName) : null;
+                
+                // Actually do the correct action based on the message
+                message.Process(this);
+
                 // Generic notification of the message
                 this.Events.NotifyMessageReceived(message);
                 
@@ -257,7 +299,7 @@ public class IndiConnection {
                         this.Events.NotifyPropertyChanged(
                             device, 
                             smsg.PropertyName,
-                            device.Properties.Get(smsg.PropertyName),
+                            old,
                             smsg.PropertyValue
                         );
                         break;
@@ -273,7 +315,8 @@ public class IndiConnection {
                         break; 
                     }
                     case IndiNotificationMessage note: {
-                        this.Events.Notify(note.Message);
+                        var device = this.GetDeviceByName(note.DeviceName);
+                        this.Events.Notify(device, note.Message);
                         break;
                     }
                 }   
@@ -281,16 +324,6 @@ public class IndiConnection {
                 // Suppress all errors for handlers
             }
 
-            // actually do the correct action based on the message
-            // adding devices or updating properties etc
-            // allow blockers to continue
-            try {
-                message.Process(this);
-            } catch {
-                // Suppress all errors processing errors
-            }
-
-            // TODO finish this off
             // If the auto connect flag is set and we are defining a connection property
             if (message is IndiDefinePropertyMessage propDef) {
                 if (this.AutoConnectDevices && !string.IsNullOrEmpty(propDef.DeviceName) && propDef.PropertyName == IndiStandardProperties.Connection) {
@@ -313,54 +346,54 @@ public class IndiConnection {
             writer.Flush();
         }
     }
-
+    private int bufferSize = 32768;
+    private int BufferSize {
+        get => bufferSize;
+        set => Math.Max(value, 1); // Must be a positive non-zero number
+    }
     private void asyncRead() {
-        StringBuilder str = new StringBuilder(client.Available);
+        StringBuilder message = new StringBuilder(BufferSize);
         while(IsConnected) {
             try {
-                while (reader != null && ((NetworkStream)reader.BaseStream).DataAvailable) {
-                    char[] buffer = new char[client.Available];
-                    var charactersRead = reader.ReadBlock(buffer, 0, buffer.Length);
-                    for(var i = 0; i < charactersRead; i++) {
-                        var c = buffer[i];
-                        if (XmlConvert.IsXmlChar(c)) {
-                            str.Append(c);
-                            if (OutputStream != null) {
-                                OutputStream.Write(c);
-                            }
-                        }
+                byte[] buffer = new byte[BufferSize];
+                var bytesRead = inputStream.Read(buffer, 0, buffer.Length);
+                if (bytesRead > 0) {
+                    var str = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    message.Append(str);
+                    if (OutputStream != null) {
+                        OutputStream.Write(str);
                     }
 
-                    var xml = str.ToString();
-                    //var now = DateTime.Now.ToString("dd-MM-yyy HH.mm.ss");
-                    //using (var fs = new StreamWriter($"{now}.data.log")) {
-                        //fs.Write(xml);
-                        //Thread.Sleep(1500);
-                    //}
-                    
-                    //try {
-                    if (tryParseXml(xml)) {
-                        str.Clear();
+                    var xml = message.ToString();
+
+                    List<IndiServerMessage> parsed;
+                    if (tryParseXml(xml, out parsed)) {
+                        foreach (var parsedMessage in parsed) {
+                            Process(parsedMessage);
+                        }
+                        message.Clear();
                     }
-                    //} catch (Exception ex) {
-                        //Console.WriteLine(ex.Message);
-                        //Console.WriteLine(ex.StackTrace);
-                    //}
                 }
+
+                Thread.Sleep(100); // Allow time for more data to come in
             } catch {
-                continue;
+                Disconnect();
+                break;
             }
         }
     }
 
-    private bool tryParseXml(string xmllike) {
+    private bool tryParseXml(string xmllike, out List<IndiServerMessage> messages) {
         // Parse XML 
+        messages = new List<IndiServerMessage>();
         XmlDocument xmlDocument = new XmlDocument();
         try {  
             xmlDocument.LoadXml("<document>" + xmllike + "</document>");
         } catch {
+            //Console.WriteLine("Awaiting more data to get valid XML");
             return false;
         }
+        //Console.WriteLine("Recieved well formatted XML");
 
         // Translate XML
         foreach (var child in xmlDocument.DocumentElement.ChildNodes) {
@@ -368,7 +401,7 @@ public class IndiConnection {
             if (child is XmlElement element) {
                 if (element.Name.StartsWith("set")) {
                     var value = parseIndiValue(element);
-                    Receive(
+                    messages.Add(
                         new IndiSetPropertyMessage(
                             element.GetAttribute("device"),
                             element.GetAttribute("name"),
@@ -378,7 +411,7 @@ public class IndiConnection {
                 }
                 else if (element.Name.StartsWith("def")) {
                     var value = parseIndiValue(element);
-                    Receive(
+                    messages.Add(
                         new IndiDefinePropertyMessage(
                             element.GetAttribute("device"),
                             element.GetAttribute("name"),
@@ -387,7 +420,7 @@ public class IndiConnection {
                     );
                 } 
                 else if (element.Name == ("delProperty")) {
-                    Receive(
+                    messages.Add(
                         new IndiDeletePropertyMessage(
                             element.GetAttribute("device"),
                             element.GetAttribute("name"),
@@ -397,7 +430,7 @@ public class IndiConnection {
                     );
                 }
                 else if (element.Name == ("message")) {
-                    Receive(
+                    messages.Add(
                         new IndiNotificationMessage(
                             element.GetAttribute("device"),
                             element.GetAttribute("timestamp"),
@@ -406,7 +439,9 @@ public class IndiConnection {
                     );
                 } 
                 // Fallback
-                else {}
+                else {
+                    
+                }
             }
             
         }
@@ -476,12 +511,13 @@ public class IndiConnection {
             return parseIndiValueVector<IndiSwitchValue>(label, value);
         } 
         else if (value.Name.EndsWith("Switch")) {
-            return new IndiSwitchValue {
+            var s = new IndiSwitchValue {
                 Name = name,
                 Label = label,
                 Switch = name,
-                Value = value.InnerText == "On"
+                Value = value.InnerText.Trim() == "On"
             };
+            return s;
         }
         // TODO handle lights
         else if (value.Name.EndsWith("LightVector")) {

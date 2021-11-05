@@ -3,10 +3,16 @@ using System.Linq;
 
 namespace Qkmaxware.Astro.Control.Controllers {
 
+/// <summary>
+/// Slew rate abstraction enum
+/// </summary>
 public enum SlewRate {
     Guide, Centering, Find, Max
 }
 
+/// <summary>
+/// Direction enum
+/// </summary>
 public enum Direction {
     None, North, South, East, West, NorthEast, NorthWest, SouthEast, SouthWest
 }
@@ -15,9 +21,27 @@ public enum Direction {
 /// Controller abstraction for telescope devices
 /// </summary>
 public class IndiTelescopeController : IndiDeviceController {
+    /// <summary>
+    /// Check if the telescope knows what direction it is pointing
+    /// </summary>
+    public bool IsOrientated => AlignmentPointCount > 0;
+    /// <summary>
+    /// Count of the number of points used to align the telescope's direction
+    /// </summary>
+    /// <value>Number of synchronized alignment points</value>
+    public int AlignmentPointCount {get; private set;}
+    /*/// <summary>
+    /// Check if the telescope's time has been synchronized
+    /// </summary>
+    public bool HasTimeBeenSet {get; private set;}
+    /// <summary>
+    /// Check if the telescope knows its geo-position
+    /// </summary>
     public bool IsPositioned {get; private set;}
-    public bool IsOrientated {get; private set;}
-    public bool IsAligned => IsPositioned && IsOrientated;
+    /// <summary>
+    /// Check if the telescope is fully aligned
+    /// </summary>
+    public bool IsAligned => HasTimeBeenSet && IsPositioned && IsOrientated;*/
 
     public IndiTelescopeController(IndiDevice device) : base(device) {}
 
@@ -41,16 +65,12 @@ public class IndiTelescopeController : IndiDeviceController {
             setMode("SYNC");
     }
 
-    public void SetTimeToClient() {
-        var vector = this.GetProperty<IndiVector<IndiTextValue>>(IndiStandardProperties.LocalUtcTime);
-        var time = DateTime.Now;
-        if (vector.IsWritable) {
-            vector.GetItemWithName("UTC").Value = time.ToUniversalTime().ToShortTimeString();
-            vector.GetItemWithName("OFFSET").Value = TimeZoneInfo.Local.GetUtcOffset(time).TotalHours.ToString();
-            SetProperty(vector.Name, vector);
-        }
-    }
-
+    /// <summary>
+    /// Synchronize the telescope's orientation (pointing direction) 
+    /// </summary>
+    /// <param name="ra">current RA angle</param>
+    /// <param name="dec">current DEC angle</param>
+    /// <param name="J2000"></param>
     public void SetOrientation(double ra, double dec, bool J2000 = false) {
         var vector = this.GetProperty<IndiVector<IndiNumberValue>>(
             J2000 
@@ -61,18 +81,13 @@ public class IndiTelescopeController : IndiDeviceController {
         vector.GetItemWithName("RA").Value = ra;
         vector.GetItemWithName("DEC").Value = dec;
         SetProperty(vector.Name, vector);
-        this.IsOrientated = true;
+        this.AlignmentPointCount++;
     }
 
-    public void SetLocation(double lat, double lon, double alt) {
-        var vector = GetProperty<IndiVector<IndiNumberValue>>(IndiStandardProperties.GeographicCoordinate);
-        vector.GetItemWithName("LAT").Value = lat;
-        vector.GetItemWithName("LONG").Value = lon;
-        vector.GetItemWithName("ELEV").Value = Math.Max(0, alt);
-        SetProperty(vector.Name, vector);
-        this.IsPositioned = true;
-    }
-
+    /// <summary>
+    /// Set the telescope's slew rate
+    /// </summary>
+    /// <param name="rate">speed</param>
     public void SetSlewRate(SlewRate rate) {
         var vector = GetProperty<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeSlewRate);
         var index = (int)(((int)rate / 3f) * (vector.Count - 1)); 
@@ -80,11 +95,18 @@ public class IndiTelescopeController : IndiDeviceController {
         SetProperty(vector.Name, vector);
     }
 
-    public void ClearMotion() {
-        Rotate(Direction.None);
+    /// <summary>
+    /// Stop the current rotation
+    /// </summary>
+    public void StopRotation() {
+        StartRotating(Direction.None);
     }
 
-    public void Rotate(Direction motion) {
+    /// <summary>
+    /// Begin telescope rotation in the given direction
+    /// </summary>
+    /// <param name="motion">direction of rotation</param>
+    public void StartRotating(Direction motion) {
         var vector = GetProperty<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeMotionWestEast);
         vector.GetSwitch("MOTION_WEST").Value = motion == Direction.West || motion == Direction.NorthWest || motion == Direction.SouthWest;
         vector.GetSwitch("MOTION_EAST").Value = motion == Direction.East || motion == Direction.NorthEast || motion == Direction.SouthEast;
@@ -96,7 +118,13 @@ public class IndiTelescopeController : IndiDeviceController {
         SetProperty(vector.Name, vector);
     }
 
-    public void Goto(double raDegrees, double decDegrees, bool J2000 = false) {
+    /// <summary>
+    /// Instruct the telescope to slew to the given coordinates
+    /// </summary>
+    /// <param name="raDegrees">desired RA angle</param>
+    /// <param name="decDegrees">desired DEC angle</param>
+    /// <param name="J2000"></param>
+    public void GotoOrientation(double raDegrees, double decDegrees, bool J2000 = false) {
         var vector = this.GetProperty<IndiVector<IndiNumberValue>>(
             J2000 
             ? IndiStandardProperties.TelescopeJ2000EquatorialCoordinate 
