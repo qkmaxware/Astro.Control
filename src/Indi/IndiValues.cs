@@ -460,6 +460,19 @@ public class IndiVector<T> : UpdatableIndiValue, IList<T> where T:IndiValue {
 /// </summary>
 public static class IndiVectorExtentions {
     /// <summary>
+    /// Get the first enabled value in this switch vector
+    /// </summary>
+    /// <param name="options">vector of options</param>
+    /// <returns>switch value</returns>
+    public static IndiSwitchValue GetFirstEnabledSwitch(this IndiVector<IndiSwitchValue> options) {
+        foreach (var option in options) {
+            if (option.Value == true) {
+                return option;
+            }
+        } 
+        return null;
+    }
+    /// <summary>
     /// Enable a specific switch
     /// </summary>
     /// <param name="options">list of possible switch values</param>

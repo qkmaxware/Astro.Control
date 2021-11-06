@@ -52,7 +52,8 @@ public abstract class IndiDeviceController {
     /// <param name="property">property to change</param>
     /// <param name="vector">value to change it to</param>
     protected void SetProperty(string property, IndiValue vector) {
-        this.device.Properties.SetAsync(property, vector);
+        if (vector != null && !string.IsNullOrEmpty(property))
+            this.device.Properties.SetAsync(property, vector);
     }
 
     /// <summary>

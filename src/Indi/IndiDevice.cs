@@ -217,6 +217,85 @@ public class IndiDevice {
     }
 
     #region Standard Property Manipulators
+    /// <summary>
+    /// The device's port
+    /// </summary>
+    /// <returns>port name if the port is found, null otherwise</returns>
+    public string Port {
+        get {
+            IndiVector<IndiTextValue> vector;
+            if (this.Properties.TryGet<IndiVector<IndiTextValue>>("DEVICE_PORT", out vector)) {
+                return vector.GetItemWithName("PORT")?.Value;
+            } else {
+                return null;
+            }
+        } set {
+            if (string.IsNullOrEmpty(value))
+                return;
+
+            IndiVector<IndiTextValue> vector;
+            if (this.Properties.TryGet<IndiVector<IndiTextValue>>("DEVICE_PORT", out vector)) {
+                var portItem = vector.GetItemWithName("PORT");
+                if (portItem != null)
+                    portItem.Value = value;
+
+                this.Properties.SetAsync(vector.Name, vector);
+            } 
+        }
+    }
+
+    /// <summary>
+    /// Device baud rate if applicable
+    /// </summary>
+    /// <value>baud rate if it exists, null otherwise</value>
+    public int? BaudRate {
+        get {
+            IndiVector<IndiSwitchValue> vector;
+            if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>("DEVICE_BAUD_RATE", out vector)) {
+                var enabled = vector.GetFirstEnabledSwitch();
+                if (enabled == null) {
+                    return null;
+                } else {
+                    int rate;
+                    if (int.TryParse(enabled.Name, out rate)) {
+                        return rate;
+                    } else {
+                        return null;
+                    }
+                }
+            } else {
+                return null;
+            }
+        }
+        set {
+            if (!value.HasValue)
+                return;
+
+            var strValue = value.Value.ToString();
+            IndiVector<IndiSwitchValue> vector;
+            if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>("DEVICE_BAUD_RATE", out vector)) {
+                vector.SwitchTo(strValue);
+                this.Properties.SetAsync(vector.Name, vector);
+            }
+        }
+    }
+    /// <summary>
+    /// List of all valid baud rates
+    /// </summary>
+    /// <value>collection of valid baud rates or empty if there are none</value>
+    public IEnumerable<int> AvailableBaudRates {
+        get {
+            IndiVector<IndiSwitchValue> vector;
+            if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>("DEVICE_BAUD_RATE", out vector)) {
+                foreach (var swch in vector) {
+                    int rate;
+                    if (int.TryParse(swch.Name, out rate)) {
+                        yield return rate;
+                    } 
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Set the device's clock
@@ -229,7 +308,6 @@ public class IndiDevice {
                 vector.GetItemWithName("OFFSET").Value = TimeZoneInfo.Local.GetUtcOffset(time).TotalHours.ToString();
                 
                 this.Properties.SetAsync(vector.Name, vector);
-                this.Properties.RefreshAsync();
             }
         }
     }
@@ -251,7 +329,6 @@ public class IndiDevice {
                 vector.GetItemWithName("ELEV").Value = Math.Max(0, alt);
 
                 this.Properties.SetAsync(vector.Name, vector);
-                this.Properties.RefreshAsync();
             }
         }
     }
