@@ -24,8 +24,9 @@ public class IndiFilterWheelController : IndiDeviceController {
     /// </summary>
     /// <returns>slot index from 1 to N</returns>
     public int GetFilterIndex() {
-        var value = this.GetProperty<IndiNumberValue>("FILTER_SLOT");
-        return (int)value.Value;
+        var value = this.GetProperty<IndiVector<IndiNumberValue>>("FILTER_SLOT")
+                    .GetItemWithName("FILTER_SLOT_VALUE")?.Value ?? 1;
+        return (int)value;
     }
 
     /// <summary>
@@ -34,13 +35,16 @@ public class IndiFilterWheelController : IndiDeviceController {
     /// <param name="index">index of the filter to change to</param>
     public void ChangeFilterAsync(int index) {
         var prop = "FILTER_SLOT";
-        var value = this.GetProperty<IndiNumberValue>(prop);
-        value.Value = index;
+        var value = this.GetProperty<IndiVector<IndiNumberValue>>(prop);
+        var slot = value.GetItemWithName("FILTER_SLOT_VALUE");
+        if (slot != null) {
+            slot.Value = index;
 
-        if (this.FilterCount.HasValue) {
-            var _internal = value.Value;
-            var N = this.FilterCount.Value;
-            value.Value = (_internal - N * Math.Floor(_internal / N));
+            if (this.FilterCount.HasValue) {
+                var _internal = slot.Value;
+                var N = this.FilterCount.Value;
+                slot.Value = (_internal - N * Math.Floor(_internal / N));
+            }
         }
 
         this.SetProperty(prop, value);
