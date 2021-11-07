@@ -270,7 +270,8 @@ public class IndiConnection {
     /// </summary>
     /// <param name="message">message to send</param>
     public void Send(IndiClientMessage message) {
-        this.SendXml(message.EncodeXml());
+        var xml = message.EncodeXml();
+        this.SendXml(xml);
         this.Events.NotifyMessageSent(message);
     }
 
@@ -390,10 +391,8 @@ public class IndiConnection {
         try {  
             xmlDocument.LoadXml("<document>" + xmllike + "</document>");
         } catch {
-            //Console.WriteLine("Awaiting more data to get valid XML");
             return false;
         }
-        //Console.WriteLine("Recieved well formatted XML");
 
         // Translate XML
         foreach (var child in xmlDocument.DocumentElement.ChildNodes) {
@@ -440,7 +439,7 @@ public class IndiConnection {
                 } 
                 // Fallback
                 else {
-                    
+
                 }
             }
             

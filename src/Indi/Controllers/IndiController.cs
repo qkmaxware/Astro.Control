@@ -32,17 +32,35 @@ public abstract class IndiDeviceController {
     }
 
     /// <summary>
-    /// Get a value or throw an exception
+    /// Get a property value or throw an exception
     /// </summary>
     /// <param name="prop">propety to get</param>
     /// <typeparam name="T">property value's type to cast</typeparam>
     /// <returns>property if the property exists and is of the given type</returns>
-    protected T GetProperty<T>(string prop) where T:IndiValue, new() {
+    protected T GetProperty<T>(string prop) where T:IndiValue {
         T value = default(T);
         if (device.Properties.TryGet<T>(prop, out value)) {
             return value;
         } else {
             throw new System.ArgumentException($"Device property '{prop}' is missing or not of type {typeof(T).Name}");
+        }
+    }
+
+    /// <summary>
+    /// Get a property value or create one from a template
+    /// </summary>
+    /// <param name="prop">propety to get</param>
+    /// <param name="factory">factory function to use when creating a new value</param>
+    /// <typeparam name="T">property value's type to cast</typeparam>
+    /// <returns>property if the property exists and is of the given type or a new value created from the factory</returns>
+    protected T GetPropertyOrNew<T>(string prop, Func<T> factory) where T:IndiValue {
+        T value = default(T);
+        if (device.Properties.TryGet<T>(prop, out value)) {
+            return value;
+        } else {
+            var created = factory();
+            created.Name = prop;
+            return created;
         }
     }
 

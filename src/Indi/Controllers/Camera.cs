@@ -45,7 +45,14 @@ public class IndiCameraController : IndiDeviceController {
 
     public void ExposeSync(float seconds) {
         var property = "CCD_EXPOSURE";
-        SetProperty(property, new IndiNumberValue { Name = "CCD_EXPOSURE_VALUE", Value = seconds });
+        var vector = this.GetPropertyOrNew<IndiVector<IndiNumberValue>>(property, () => {
+            var v = new IndiVector<IndiNumberValue>(property);
+            v.Add(new IndiNumberValue { Name = "CCD_EXPOSURE_VALUE", Value = seconds });
+            return v;
+        });
+        vector.GetItemWithName("CCD_EXPOSURE_VALUE").Value = seconds;
+
+        SetProperty(property, vector);
         Thread.Sleep(TimeSpan.FromSeconds(seconds));
     }
 
@@ -53,7 +60,14 @@ public class IndiCameraController : IndiDeviceController {
         var cancel = new CancellationTokenSource();
         Task.Run(() => {
             var property = "CCD_EXPOSURE";
-            SetProperty(property, new IndiNumberValue { Name = "CCD_EXPOSURE_VALUE", Value = seconds });
+            var vector = this.GetPropertyOrNew<IndiVector<IndiNumberValue>>(property, () => {
+                var v = new IndiVector<IndiNumberValue>(property);
+                v.Add(new IndiNumberValue { Name = "CCD_EXPOSURE_VALUE", Value = seconds });
+                return v;
+            });
+            vector.GetItemWithName("CCD_EXPOSURE_VALUE").Value = seconds;
+
+            SetProperty(property, vector);
             var end = DateTime.Now + TimeSpan.FromSeconds(seconds);
             while(DateTime.Now < end) {
                 if (cancel.IsCancellationRequested) {
