@@ -15,21 +15,21 @@ public class IndiCameraController : IndiDeviceController {
 
     public void EnableCooling(bool isCooling) {
         var property = "CCD_COOLER";
-        var vector = GetProperty<IndiSwitchVector>(property);
+        var vector = GetPropertyOrThrow<IndiSwitchVector>(property);
         vector.SwitchTo(isCooling ? "COOLER_ON" : "COOLER_OFF");
         SetProperty(property, vector);
     }
 
     public void UseRAW() {
         var property = "CCD_COMPRESSION";
-        var vector = GetProperty<IndiSwitchVector>(property);
+        var vector = GetPropertyOrThrow<IndiSwitchVector>(property);
         vector.SwitchTo("CCD_RAW");
         SetProperty(property, vector);
     }
     
     public void UseCompression() {
         var property = "CCD_COMPRESSION";
-        var vector = GetProperty<IndiSwitchVector>(property);
+        var vector = GetPropertyOrThrow<IndiSwitchVector>(property);
         vector.SwitchTo("CCD_COMPRESS");
         SetProperty(property, vector);
     }

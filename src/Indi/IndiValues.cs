@@ -473,6 +473,15 @@ public static class IndiVectorExtentions {
         return null;
     }
     /// <summary>
+    /// Check if the switch with the given name is on
+    /// </summary>
+    /// <param name="options">list of switches</param>
+    /// <param name="name">name of the switch</param>
+    /// <returns>true if the switch is on</returns>
+    public static bool IsOn(this IndiVector<IndiSwitchValue> options, string name) {
+        return options.GetSwitch(name)?.IsOn ?? false;
+    }
+    /// <summary>
     /// Enable a specific switch
     /// </summary>
     /// <param name="options">list of possible switch values</param>

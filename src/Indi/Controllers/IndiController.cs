@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Qkmaxware.Astro.Control.Controllers {
@@ -13,6 +14,10 @@ public abstract class IndiDeviceController {
     /// Name of the controlled INDI device
     /// </summary>
     public string DeviceName => device.Name;
+    /// <summary>
+    /// Port used by the INDI device
+    /// </summary>
+    public string DevicePort => device.Port;
 
     /// <summary>
     /// Create a controller around this given device
@@ -37,12 +42,27 @@ public abstract class IndiDeviceController {
     /// <param name="prop">propety to get</param>
     /// <typeparam name="T">property value's type to cast</typeparam>
     /// <returns>property if the property exists and is of the given type</returns>
-    protected T GetProperty<T>(string prop) where T:IndiValue {
+    protected T GetPropertyOrThrow<T>(string prop) where T:IndiValue {
         T value = default(T);
         if (device.Properties.TryGet<T>(prop, out value)) {
             return value;
         } else {
             throw new System.ArgumentException($"Device property '{prop}' is missing or not of type {typeof(T).Name}");
+        }
+    }
+
+    /// <summary>
+    /// Get a property value or return the default value
+    /// </summary>
+    /// <param name="prop">propety to get</param>
+    /// <typeparam name="T">property value's type to cast</typeparam>
+    /// <returns>property if the property exists and is of the given type</returns>
+    protected T GetPropertyOrDefault<T>(string prop) where T:IndiValue {
+        T value = default(T);
+        if (device.Properties.TryGet<T>(prop, out value)) {
+            return value;
+        } else {
+            return default(T);
         }
     }
 
@@ -72,6 +92,14 @@ public abstract class IndiDeviceController {
     protected void SetProperty(string property, IndiValue vector) {
         if (vector != null && !string.IsNullOrEmpty(property))
             this.device.Properties.SetAsync(property, vector);
+    }
+    
+    /// <summary>
+    /// Change the value of a vector property, property name interpreted from the vector's 'Name' property
+    /// </summary>
+    /// <param name="vector">value to change it to</param>
+    protected void SetProperty<T>(IndiVector<T> vector) where T:IndiValue {
+        this.SetProperty(vector.Name, vector);
     }
 
     /// <summary>
@@ -109,6 +137,39 @@ public abstract class IndiDeviceController {
     }
 
     /// <summary>
+    /// Fetch a list of all active devices visible to this device
+    /// </summary>
+    /// <returns>dictionary of device kind, device name pairs</returns>
+    public Dictionary<string, string> GetSnoopedDevices() {
+        var vec = this.GetPropertyOrDefault<IndiVector<IndiTextValue>>("ACTIVE_DEVICES");
+        if (vec != null) {
+            return vec.ToDictionary(
+                (text) => text.Name,
+                (text) => text.Value
+            );
+        } else {
+            return new Dictionary<string, string>();
+        }
+    }
+
+    /// <summary>
+    /// Allow this device to snoop on another
+    /// </summary>
+    /// <param name="deviceKind">kind of device</param>
+    /// <param name="deviceName">name of device to snoop on</param>
+    public void SnoopDevice(string deviceKind, string deviceName) {
+        var vec = this.GetPropertyOrThrow<IndiVector<IndiTextValue>>("ACTIVE_DEVICES");
+        var item = vec.GetItemWithName(deviceKind);
+        if (item == null) {
+            item = new IndiTextValue();
+            item.Name = deviceKind; item.Label = deviceKind;
+            vec.Add(item);
+        }
+        item.Value = deviceName;
+        SetProperty(vec);
+    }
+
+    /// <summary>
     /// Set the device's time to the current time on the client system
     /// </summary>
     public void SetTimeFromClient() {
@@ -123,6 +184,14 @@ public abstract class IndiDeviceController {
     /// <param name="alt">altitude in meters</param>
     public void SetGeolocation(double lat, double lon, double alt = 0) {
         this.device.SetGeolocation(lat, lon, alt);
+    }
+
+    /// <summary>
+    /// Explicitly downcast a controller to a basic device
+    /// </summary>
+    /// <param name="ctrl">controller to downcast</param>
+    public static explicit operator IndiDevice(IndiDeviceController ctrl) {
+        return ctrl.device;
     }
 
 }

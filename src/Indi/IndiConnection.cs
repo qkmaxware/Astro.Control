@@ -116,16 +116,7 @@ public class ThreadsafeDeviceCollection: ConcurrentDictionary<string, IndiDevice
 /// <summary>
 /// Connection from client machine to INDI server
 /// </summary>
-public class IndiConnection {
-    /// <summary>
-    /// The server that this connection is established to
-    /// </summary>
-    /// <value>connected server</value>
-    public IndiServer Server {get; private set;}
-    private TcpClient client;
-    private Stream inputStream;
-    private StreamWriter writer;
-
+public class IndiConnection : BaseTcpConnection {
     /// <summary>
     /// Flag to indicate if disconnected devices should be connected automatically when discovered
     /// </summary>
@@ -136,11 +127,6 @@ public class IndiConnection {
     /// Output stream to print all received messages to
     /// </summary>
     public TextWriter OutputStream;
-
-    /// <summary>
-    /// Check if the connection is active
-    /// </summary>
-    public bool IsConnected => client != null && client.Connected;
 
     /// <summary>
     /// Devices acquired from this connection
@@ -156,9 +142,8 @@ public class IndiConnection {
     /// <value>event dispatcher</value>
     public IndiConnectionEventDispatcher Events {get; private set;}
 
-    internal IndiConnection (IndiServer server, IndiConnectionEventDispatcher eventDispatcher = null) {
+    internal IndiConnection (IndiServer server, IndiConnectionEventDispatcher eventDispatcher = null) : base(server) {
         var builder = new UriBuilder();
-        this.Server = server;
         this.Events = eventDispatcher ?? new IndiConnectionEventDispatcher();
     }
 
@@ -232,36 +217,11 @@ public class IndiConnection {
         this.Send(new IndiGetPropertiesMessage());
     }
 
-    /// <summary>
-    /// Attempt to reconnect if no longer connected
-    /// </summary>
-    public void ReConnect() {
-        if (!IsConnected) {
-            try {
-                client = new TcpClient(Server.Host, Server.Port);
-                if (IsConnected) {
-                    NetworkStream stream = client.GetStream();
-                    inputStream =  stream;
-                    writer = new StreamWriter(stream, Encoding.UTF8);
-
-                    Task.Run(asyncRead);
-
-                    this.Events.NotifyServerConnected();
-                }
-            } catch {
-                Disconnect();
-            }
-        }
+    protected override void ConnectionEstablished() {
+        this.Events.NotifyServerConnected();
     }
 
-    /// <summary>
-    /// Disconnect from the INDI server
-    /// </summary>
-    public void Disconnect() {
-        client?.Close();
-        client = null;
-        inputStream = null;
-        writer = null;
+    protected override void ConnectionClosed() {
         this.Events.NotifyServerDisconnected();
     }
 
@@ -342,17 +302,14 @@ public class IndiConnection {
     /// </summary>
     /// <param name="xml">xml message</param>
     public void SendXml(string xml) {
-        if (IsConnected) {
-            writer.Write(xml);
-            writer.Flush();
-        }
+        this.Write(xml);
     }
     private int bufferSize = 32768;
     private int BufferSize {
         get => bufferSize;
         set => Math.Max(value, 1); // Must be a positive non-zero number
     }
-    private void asyncRead() {
+    protected override void AsyncRead() {
         StringBuilder message = new StringBuilder(BufferSize);
         while(IsConnected) {
             try {

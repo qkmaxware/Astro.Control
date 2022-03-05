@@ -11,6 +11,13 @@ public enum SlewRate {
 }
 
 /// <summary>
+/// Tracking rate abstraction enum
+/// </summary>
+public enum TrackingRate {
+    Sidereal, Solar, Lunar, King, Custom
+}
+
+/// <summary>
 /// Direction enum
 /// </summary>
 public enum Direction {
@@ -21,33 +28,11 @@ public enum Direction {
 /// Controller abstraction for telescope devices
 /// </summary>
 public class IndiTelescopeController : IndiDeviceController {
-    /// <summary>
-    /// Check if the telescope knows what direction it is pointing
-    /// </summary>
-    public bool IsOrientated => AlignmentPointCount > 0;
-    /// <summary>
-    /// Count of the number of points used to align the telescope's direction
-    /// </summary>
-    /// <value>Number of synchronized alignment points</value>
-    public int AlignmentPointCount {get; private set;}
-    /*/// <summary>
-    /// Check if the telescope's time has been synchronized
-    /// </summary>
-    public bool HasTimeBeenSet {get; private set;}
-    /// <summary>
-    /// Check if the telescope knows its geo-position
-    /// </summary>
-    public bool IsPositioned {get; private set;}
-    /// <summary>
-    /// Check if the telescope is fully aligned
-    /// </summary>
-    public bool IsAligned => HasTimeBeenSet && IsPositioned && IsOrientated;*/
-
     public IndiTelescopeController(IndiDevice device) : base(device) {}
 
     private string mode;
     private void setMode(string mode) {
-        var vector = GetProperty<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeOnCoordinateSet);;
+        var vector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeOnCoordinateSet);;
         this.mode = mode;
         vector.SwitchTo((toggle) => toggle.Name == mode);
         SetProperty("ON_COORD_SET", vector);
@@ -72,7 +57,7 @@ public class IndiTelescopeController : IndiDeviceController {
     /// <param name="dec">current DEC angle</param>
     /// <param name="J2000"></param>
     public void SetOrientation(double ra, double dec, bool J2000 = false) {
-        var vector = this.GetProperty<IndiVector<IndiNumberValue>>(
+        var vector = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>(
             J2000 
             ? IndiStandardProperties.TelescopeJ2000EquatorialCoordinate 
             : IndiStandardProperties.TelescopeJNowEquatorialCoordinate
@@ -81,7 +66,6 @@ public class IndiTelescopeController : IndiDeviceController {
         vector.GetItemWithName("RA").Value = ra;
         vector.GetItemWithName("DEC").Value = dec;
         SetProperty(vector.Name, vector);
-        this.AlignmentPointCount++;
     }
 
     /// <summary>
@@ -89,7 +73,7 @@ public class IndiTelescopeController : IndiDeviceController {
     /// </summary>
     /// <param name="rate">speed</param>
     public void SetSlewRate(SlewRate rate) {
-        var vector = GetProperty<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeSlewRate);
+        var vector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeSlewRate);
         var index = (int)(((int)rate / 3f) * (vector.Count - 1)); 
         vector.SwitchTo(index);
         SetProperty(vector.Name, vector);
@@ -107,12 +91,12 @@ public class IndiTelescopeController : IndiDeviceController {
     /// </summary>
     /// <param name="motion">direction of rotation</param>
     public void StartRotating(Direction motion) {
-        var vector = GetProperty<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeMotionWestEast);
+        var vector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeMotionWestEast);
         vector.GetSwitch("MOTION_WEST").Value = motion == Direction.West || motion == Direction.NorthWest || motion == Direction.SouthWest;
         vector.GetSwitch("MOTION_EAST").Value = motion == Direction.East || motion == Direction.NorthEast || motion == Direction.SouthEast;
         SetProperty(vector.Name, vector);
 
-        vector = GetProperty<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeMotionNorthSouth);
+        vector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeMotionNorthSouth);
         vector.GetSwitch("MOTION_NORTH").Value = motion == Direction.North || motion == Direction.NorthEast || motion == Direction.NorthWest;
         vector.GetSwitch("MOTION_SOUTH").Value = motion == Direction.South || motion == Direction.SouthEast || motion == Direction.SouthWest;
         SetProperty(vector.Name, vector);
@@ -124,8 +108,8 @@ public class IndiTelescopeController : IndiDeviceController {
     /// <param name="raDegrees">desired RA angle</param>
     /// <param name="decDegrees">desired DEC angle</param>
     /// <param name="J2000"></param>
-    public void GotoOrientation(double raDegrees, double decDegrees, bool J2000 = false) {
-        var vector = this.GetProperty<IndiVector<IndiNumberValue>>(
+    public void Goto(double raDegrees, double decDegrees, bool J2000 = false) {
+        var vector = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>(
             J2000 
             ? IndiStandardProperties.TelescopeJ2000EquatorialCoordinate 
             : IndiStandardProperties.TelescopeJNowEquatorialCoordinate
@@ -134,6 +118,33 @@ public class IndiTelescopeController : IndiDeviceController {
         vector.GetItemWithName("RA").Value = raDegrees;
         vector.GetItemWithName("DEC").Value = decDegrees;
         SetProperty(vector.Name, vector);
+    }
+    /// <summary>
+    /// Instruct the telescope to slew to the given coordinates and track the object
+    /// </summary>
+    /// <param name="raDegrees">desired RA angle</param>
+    /// <param name="decDegrees">desired DEC angle</param>
+    /// <param name="rate">tracking rate</param>
+    /// <param name="J2000"></param>
+    public void Track(double raDegrees, double decDegrees, TrackingRate rate = TrackingRate.Sidereal, bool J2000 = false) {
+        // Set tracking rate
+        var rateString = "TRACK_" + rate.ToString().ToUpperInvariant();
+        var trackVector = this.GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("TELESCOPE_TRACK_RATE");
+        if (trackVector != null) {
+            trackVector.SwitchTo(rateString);
+            SetProperty(trackVector);
+        }
+
+        // Set the tracking position
+        var posVector = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>(
+            J2000 
+            ? IndiStandardProperties.TelescopeJ2000EquatorialCoordinate 
+            : IndiStandardProperties.TelescopeJNowEquatorialCoordinate
+        );
+        trackNext();
+        posVector.GetItemWithName("RA").Value = raDegrees;
+        posVector.GetItemWithName("DEC").Value = decDegrees;
+        SetProperty(posVector);
     }
 }
 

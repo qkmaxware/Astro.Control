@@ -1,7 +1,18 @@
 # Astro.Control
-C# INDI client library to interface with INDI servers. This client allows C# developers to write code to remotely control telescope and scientific equipment that is connected to an INDI server. 
+C# client library for control of astronomical equipment using remote protocols for interfacing with established astronomical control software including INDI and PHD2. 
 
-## Basic Usage
+- [Astro.Control](#astrocontrol)
+  - [INDI](#indi)
+    - [Basic Usage](#basic-usage)
+  - [PHD2](#phd2)
+    - [Basic Usage](#basic-usage-1)
+
+## INDI
+![](https://indilib.org/templates/rt_antares/custom/images/logo/indi_logo.png)
+
+[INDI](https://indilib.org/) is a simple XML-like communications protocol described for interactive and automated remote control of diverse instrumentation. A device that includes an INDI server such as [Astroberry](https://www.astroberry.io/) is required for the code in this libary to interface with. The server actually controls the equipment while a client running this codebase can send instructions to the server. 
+
+### Basic Usage
 1. Connect to the INDI server
 ```cs
 var server = new IndiServer("localhost");
@@ -51,3 +62,24 @@ if (server.TryConnect(out conn)) {
         telescope.StartRotating(Direction.North);
     }
 ```
+
+## PHD2
+![](https://openphdguiding.org/wp-content/themes/openphd/images/header.png)
+
+[PHD2](https://openphdguiding.org/) (Press Here Dummy) is a telescope guiding software for providing small and continuous adjustments to telescope mounts in order to keep a target imaging area as stable as possible for longer exposure imaging. It is known for its simplicity and ease of use. PHD2 includes a server mode and uses a JSON schema to communicate with a client library such as this one.
+
+### Basic Usage
+1. Connect to the PHD2 server
+```cs
+var server = new Phd2Server("localhost");
+Phd2Server conn;
+if (server.TryConnect(out conn)) {
+    // ...
+}
+```
+2. Configure connection and assign event listeners (optional)
+```cs
+    conn.Events.OnOnAppStateChanged += (state) => { ... };
+    // ...
+```
+3. 

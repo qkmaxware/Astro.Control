@@ -7,51 +7,102 @@ using System.Linq;
 
 namespace Qkmaxware.Astro.Control.Controllers {
 
+/// <summary>
+/// Controller abstraction for focuser devices
+/// </summary>
 public class IndiFocuserController : IndiDeviceController {
 
     public IndiFocuserController(IndiDevice device) : base(device) {}
 
     /// <summary>
-    /// Begin focusing inwards
+    /// Check if this focuser's direction is reversed
     /// </summary>
-    /// <param name="speed">focusing speed from 0 to Max</param>
-    public void StartFocusingInward(int speed) {
-        // Set direction
-        var direction = this.GetProperty<IndiVector<IndiSwitchValue>>("FOCUS_MOTION");
-        direction.SwitchTo("FOCUS_INWARD");
-        this.SetProperty("FOCUS_MOTION", direction);
-
-        // Set speed
-        var speedValue = this.GetProperty<IndiNumberValue>("FOCUS_SPEED");
-        speedValue.Value = speed;
-        this.SetProperty("FOCUS_SPEED", speedValue);
+    /// <value>true if the focuser's movement direction is reversed</value>
+    public bool IsMotionReversed {
+        get {
+            var vector = this.GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("FOCUS_REVERSE_MOTION");
+            if (vector != null) {
+                return vector.IsOn("ENABLED");
+            } else {
+                return false;
+            }
+        }
+        set {
+            var vector = this.GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("FOCUS_REVERSE_MOTION");
+            if (vector != null) {
+                if (value) {
+                    vector.SwitchTo("ENABLED");
+                } else {
+                    vector.SwitchTo("DISABLED");
+                }
+                this.SetProperty(vector);
+            }
+        }
     }
 
     /// <summary>
-    /// Begin focusing outwards
+    /// The absolute position of the focuser
     /// </summary>
-    /// <param name="speed">focusing speed from 0 to Max</param>
-    public void StartFocusingOutward(int speed) {
-        // Set direction
-        var direction = this.GetProperty<IndiVector<IndiSwitchValue>>("FOCUS_MOTION");
-        direction.SwitchTo("FOCUS_OUTWARD");
-        this.SetProperty("FOCUS_MOTION", direction);
-
-        // Set speed
-        var speedValue = this.GetProperty<IndiNumberValue>("FOCUS_SPEED");
-        speedValue.Value = speed;
-        this.SetProperty("FOCUS_SPEED", speedValue);
+    /// <value>the absolute position of the focuser</value>
+    public int AbsolutePosition {
+        get {
+            var vector = this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>("ABS_FOCUS_POSITION");
+            if (vector != null) {
+                return (int)(vector.GetItemWithName("FOCUS_ABSOLUTE_POSITION")?.Value ?? 0);
+            } else {
+                return 0;
+            }
+        } set {
+            var vector = this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>("FOCUS_SYNC");
+            if (vector != null) {
+                var v = vector.GetItemWithName("FOCUS_SYNC_VALUE");
+                if (v != null)
+                    v.Value = value;
+                SetProperty(vector);
+            }
+        }
     }
 
     /// <summary>
-    /// Stop all focusing motion
+    /// The speed of the focuser
     /// </summary>
-    public void StopFocusing() {
-        var abort = this.GetProperty<IndiVector<IndiSwitchValue>>("FOCUS_ABORT_MOTION");
-        abort.SwitchTo("ABORT");
-        this.SetProperty("FOCUS_ABORT_MOTION", abort);
+    /// <value>the speed of the focuser</value>
+    public int Speed {
+        get {
+            var vector = this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>("FOCUS_SPEED");
+            if (vector != null) {
+                return (int)(vector.GetItemWithName("FOCUS_SPEED_VALUE")?.Value ?? 0);
+            } else {
+                return 0;
+            }
+        } set {
+            var vector = this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>("FOCUS_SPEED");
+            if (vector != null) {
+                var v = vector.GetItemWithName("FOCUS_SPEED_VALUE");
+                if (v != null)
+                    v.Value = value;
+                SetProperty(vector);
+            }
+        }
     }
 
+    /// <summary>
+    /// Focus inwards by the specific number of steps
+    /// </summary>
+    /// <param name="steps">steps to focus</param>
+    public void FocusInwards(int steps) {
+        var vector = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>("REL_FOCUS_POSITION");
+        vector.GetItemWithName("FOCUS_RELATIVE_POSITION").Value = steps;
+        SetProperty(vector);
+    }
+
+    /// <summary>
+    /// Focus outwards by the specific number of steps
+    /// </summary>
+    /// <param name="steps">steps to focus</param>
+    public void FocusOutwards(int steps) {
+        FocusInwards(-steps);
+    }
 }
 
 }

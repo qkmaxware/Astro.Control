@@ -1,27 +1,14 @@
-using System;
-using System.Linq;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml;
-using System.Xml.Linq;
-using System.Dynamic;
-using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using System.Threading;
-
 namespace Qkmaxware.Astro.Control {
 
 /// <summary>
-/// INDI server information
+/// Phd2 server information
 /// </summary>
-public class IndiServer : IServerSpecification {
+public class Phd2Server : IServerSpecification {
     /// <summary>
-    /// Default port used by INDI servers
+    /// Default port used by PHD2 servers
     /// </summary>
-    public static readonly int DefaultPort = 7624;
+    public static readonly int DefaultPort = 4400;
+    
     /// <summary>
     /// Server host ip
     /// </summary>
@@ -34,32 +21,32 @@ public class IndiServer : IServerSpecification {
     public int Port {get; private set;}
 
     /// <summary>
-    /// Create a new reference to an INDI server
+    /// Create a new reference to an PHD2 server
     /// </summary>
     /// <param name="host">host string</param>
     /// <param name="port">port</param>
-    public IndiServer(string host, int port = 7624) {
+    public Phd2Server(string host, int port = 4400) {
         this.Host = host;
         this.Port = port;
     }
 
     /// <summary>
-    /// Try to establish a connection to the INDI server
+    /// Try to establish a connection to the PHD2 server
     /// </summary>
     /// <param name="conn">connection if successful</param>
     /// <returns>true if connection was successful, false otherwise</returns>
-    public bool TryConnect(out IndiConnection conn) {
+    public bool TryConnect(out Phd2Connection conn) {
         return TryConnect(out conn, null);
     }
 
     /// <summary>
-    /// Try to establish a connection to the INDI server
+    /// Try to establish a connection to the PHD2 server
     /// </summary>
     /// <param name="conn">connection if successful</param>
-    /// <param name="listeners">list of INDI listeners to automatically subscribe to the connection if successful</param>
+    /// <param name="events">event listeners</param>
     /// <returns>true if connection was successful, false otherwise</returns>
-    public bool TryConnect(out IndiConnection conn, IndiConnectionEventDispatcher dispatcher) {
-        conn = new IndiConnection(this, dispatcher);
+    public bool TryConnect(out Phd2Connection conn, Phd2ConnectionEventDispatcher events) {
+        conn = new Phd2Connection(this, events);
         conn.ReConnect();
         if (conn.IsConnected) {
             return true;
@@ -70,5 +57,6 @@ public class IndiServer : IServerSpecification {
         }
     }
 }
+
 
 }
