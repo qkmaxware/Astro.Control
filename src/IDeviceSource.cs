@@ -32,6 +32,12 @@ public interface IDeviceSource {
     /// </summary>
     /// <returns>enumerable of telescopes</returns>
     IEnumerable<ITelescope> EnumerateTelescopes();
+
+    /// <summary>
+    /// List all auto-guiders that are available for control via this source
+    /// </summary>
+    /// <returns>enumerable of guiders</returns>
+    IEnumerable<IGuider> EnumerateAutoGuiders();
 }
 
 }

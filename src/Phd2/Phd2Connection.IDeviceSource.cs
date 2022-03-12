@@ -1,41 +1,41 @@
-using System.Collections.Generic;
 using System.Linq;
+using System.Collections.Generic;
 using Qkmaxware.Astro.Control.Devices;
 
 namespace Qkmaxware.Astro.Control {
 
-public partial class IndiConnection : IDeviceSource {
+public partial class Phd2Connection : IDeviceSource {
     /// <summary>
     /// List all camera that are available for control via this source
     /// </summary>
     /// <returns>enumerable of cameras</returns>
-    public IEnumerable<ICamera> EnumerateCameras() => this.Devices.AllCCDs().Select(device => new IndiCameraController(device));
+    public IEnumerable<ICamera> EnumerateCameras() => Enumerable.Empty<ICamera>();
     /// <summary>
     /// List all observation domes that are available for control via this source
     /// </summary>
     /// <returns>enumerable of domes</returns>
-    public IEnumerable<IDome> EnumerateDomes() => this.Devices.AllDomes().Select(device => new IndiDomeController(device));
+    public IEnumerable<IDome> EnumerateDomes() => Enumerable.Empty<IDome>();
     /// <summary>
     /// List all filter wheels that are available for control via this source
     /// </summary>
     /// <returns>enumerable of filter wheels</returns>
-    public IEnumerable<IFilterWheel> EnumerateFilterWheels() => this.Devices.AllFilterWheels().Select(device => new IndiFilterWheelController(device));
+    public IEnumerable<IFilterWheel> EnumerateFilterWheels() => Enumerable.Empty<IFilterWheel>();
     /// <summary>
     /// List all focusers that are available for control via this source
     /// </summary>
     /// <returns>enumerable of focusers</returns>
-    public IEnumerable<IFocuser> EnumerateFocusers() => this.Devices.AllFocusers().Select(device => new IndiFocuserController(device));
+    public IEnumerable<IFocuser> EnumerateFocusers() => Enumerable.Empty<IFocuser>();
     /// <summary>
     /// List all telescopes that are available for control via this source
     /// </summary>
     /// <returns>enumerable of telescopes</returns>
-    public IEnumerable<ITelescope> EnumerateTelescopes() => this.Devices.AllTelescopes().Select((device) => new IndiTelescopeController(device));
+    public IEnumerable<ITelescope> EnumerateTelescopes() => Enumerable.Empty<ITelescope>();
 
     /// <summary>
     /// List all auto-guiders that are available for control via this source
     /// </summary>
     /// <returns>enumerable of guiders</returns>
-    public IEnumerable<IGuider> EnumerateAutoGuiders() => Enumerable.Empty<IGuider>();
+    public IEnumerable<IGuider> EnumerateAutoGuiders() => this.EnumerateProfiles;
 }
 
 }

@@ -1,68 +1,22 @@
-using System.Text;
-using System.Threading.Tasks;
 using System.Text.Json;
 using System;
-using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Collections.Generic;
+using Qkmaxware.Measurement;
+using System.Collections;
 
 namespace Qkmaxware.Astro.Control {
 
-public class Phd2Connection : BaseTcpConnection {
+public partial class Phd2Connection : JsonRpcClient {
     /// <summary>
     /// Event dispatcher which can have its events subscribed to by listeners
     /// </summary>
     /// <value>event dispatcher</value>
     public Phd2ConnectionEventDispatcher Events {get; private set;}
 
-    /// <summary>
-    /// Output stream to print all received messages to
-    /// </summary>
-    public TextWriter OutputStream;
-
     internal Phd2Connection (Phd2Server server, Phd2ConnectionEventDispatcher events = null) :  base(server) {
         this.Events = events ?? new Phd2ConnectionEventDispatcher();
-    }
-
-    private static int bufferSize = 1000;
-
-    protected override void AsyncRead() {
-        int depth = 0;
-        bool inQuotes = false;
-        char lastChar = default(char);
-
-        StringBuilder buffer = new StringBuilder(bufferSize);
-
-        while (this.IsConnected) {
-            // Try to read in the next character
-            char b = (char)this.inputStream.ReadByte();
-            if (b < 0) {
-                this.Disconnect();
-                return;
-            }
-            buffer.Append(b);
-
-            // Track if we enter or exist an object
-            if (b == '"' && lastChar != '\\') {
-                inQuotes = !inQuotes;
-            } else if (b == '{' && !inQuotes) {
-                depth++;
-            } else if (b == '}' && !inQuotes) {
-                depth--;
-            }
-
-            // When "outer-most" object is closed
-            if (depth == 0 && buffer.Length > 0) {
-                try {
-                    var json = buffer.ToString();                   // Get json
-                    if (this.OutputStream != null)
-                        this.OutputStream.Write(json);              // Redirect recieved messages
-                    var obj = JsonDocument.Parse(json);             // Parse the object
-                    Task.Run(() => process(obj.RootElement));       // Process the message on a new thread
-                    buffer.Clear();                                 // Clear the buffer to prepare for future objects
-                } catch {}
-            }
-        }
     }
 
     #region Event Types
@@ -94,18 +48,12 @@ public class Phd2Connection : BaseTcpConnection {
     private const string ConfigurationChange = "ConfigurationChange";
     #endregion
 
-    private void process(JsonElement node) {
-        if (node.ValueKind != JsonValueKind.Object)
-            return; // Messages sent from PHD2 are objects
-        
-        // Check if is an event message or an RPC call
+    protected override void processNonRpcResponse(JsonElement node) {
+        // only process object messages with an "event" tag
         JsonElement tag;
         if (node.TryGetProperty("Event", out tag)) {
             processEvent(node);
-        } else if (node.TryGetProperty("jsonrpc", out tag)) {
-            processRpcResponse(node);
         }
-        
     }
 
     private static T MapMsg2Obj<T>(T entity, JsonElement node) {
@@ -202,15 +150,18 @@ public class Phd2Connection : BaseTcpConnection {
             case LoopingExposures:  {
                 var message = MapMsg2Obj(new Phd2LoopingExposuresIterationMessage(), node);
                 Events.NotifyLoopingExposuresIteration(message);
+                this.setState("Looping");
             } break;
             case LoopingExposuresStopped: {
                 var message = MapMsg2Obj(new Phd2LoopingExposuresStoppedMessage(), node);
                 Events.NotifyLoopingExposuresStopped(message);
+                this.setState("Stopped");
             } break;
 
             case StartCalibration: {
                 var message = MapMsg2Obj(new Phd2CalibrationStartMessage(), node);
                 Events.NotifyCalibrationStart(message);
+                this.setState("Calibrating");
             } break;
             case Calibrating: {
                 var message = MapMsg2Obj(new Phd2CalibratingMessage(), node);
@@ -232,6 +183,7 @@ public class Phd2Connection : BaseTcpConnection {
             case StarSelected: {
                 var message = MapMsg2Obj(new Phd2StarSelectedMessage(), node);
                 Events.NotifyStarSelected(message);
+                this.setState("Selected");
             } break;
             case StartGuiding: {
                 var message = MapMsg2Obj(new Phd2StartGuidingMessage(), node);
@@ -244,6 +196,7 @@ public class Phd2Connection : BaseTcpConnection {
             case GuideStep: {
                 var message = MapMsg2Obj(new Phd2GuideStepMessage(), node);
                 Events.NotifyGuideStep(message);
+                this.setState("Guiding");
             } break;
             case GuidingStopped: {
                 var message = MapMsg2Obj(new Phd2StoppedGuidingMessage(), node);
@@ -260,10 +213,12 @@ public class Phd2Connection : BaseTcpConnection {
             case Paused: {
                 var message = MapMsg2Obj(new Phd2PausedGuidingMessage(), node);
                 Events.NotifyPausedGuiding(message);
+                this.setState("Paused");
             } break;
             case StarLost: {
                 var message = MapMsg2Obj(new Phd2StarLostMessage(), node);
                 Events.NotifyStarLost(message);
+                this.setState("LostLock");
             } break;
 
             case SettleBegin: {
@@ -291,12 +246,64 @@ public class Phd2Connection : BaseTcpConnection {
     private void setState(Phd2AppStateMessage message) {
         this.State = message.State;
     }
+    private void setState(string state) {
+        this.State = state;
+    }
     # endregion
 
     # region RPC 
     // https://github.com/OpenPHDGuiding/phd2/wiki/EventMonitoring#available-methods
-    private void processRpcResponse(JsonElement node) {
+    public void CaptureSingleFrame(Duration exposure) {
+        var req = new JsonRpcClient.Request("capture_single_frame", (double)exposure.TotalMilliseconds());
+        this.Send(req);
+    } 
+    public void ClearCalibration() {
+        var req = new JsonRpcClient.Request("clear_calibration", "both");
+        this.Send(req);
+    }
+    public void FlipCalibration() {
+        var req = new JsonRpcClient.Request("flip_calibration");
+        this.Send(req);
+    }
+    public void StopCapture () {
+        var req = new JsonRpcClient.Request("stop_capture");
+        this.Send(req);
+    }
+    public void SelectProfile(Phd2Profile profile) {
+        this.SelectProfileWithId(profile.Id);
+    }
+    public void SelectProfileWithId(int id) {
+        var req = new JsonRpcClient.Request("set_profile", id);
+        this.Send(req);
+    }
+    public void Guide(double pixelStableGuideDistance = 1.5, double settleTime = 10, double settlingTimeout = 60, bool recalibrate = false) {
+        // First transmit stop_capture to "start fresh" as stated here https://github.com/OpenPHDGuiding/phd2/wiki/EventMonitoring#guide-method
+        var req = new JsonRpcClient.Request("guide", new Dictionary<string, object> {
+            {"settle", new Dictionary<string,object> {
+                {"pixels",  pixelStableGuideDistance}, 
+                {"time",    settleTime}, 
+                {"timeout", settlingTimeout}
+            }},
+            {"recalibrate", recalibrate}
+        });
+        this.Send(req);
+    }
+    private List<Phd2Profile> cachedProfiles = new List<Phd2Profile>();
+    public IEnumerable<Phd2Profile> EnumerateProfiles => cachedProfiles.AsReadOnly();
+    public void FetchRemoteProfiles() {
+        var req = new JsonRpcClient.Request("get_profiles");
+        var task = this.Send(req);
+        task.Wait();
+        var profiles = task.Result.result;
+        cachedProfiles.Clear();
 
+        if (profiles != null && profiles is IEnumerable profileArray) {
+            foreach (var profile in profileArray) {
+                if (profile is IDictionary<string, object> profileObject) {
+                    this.cachedProfiles.Add(new Phd2Profile((int)profileObject["id"], profileObject["name"]?.ToString(), this));
+                }
+            }
+        }
     }
     #endregion
 }
