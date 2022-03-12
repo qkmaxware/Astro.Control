@@ -8,7 +8,7 @@ namespace Qkmaxware.Astro.Control {
 /// <summary>
 /// Base class for TCP based connections
 /// </summary>
-public abstract class BaseTcpConnection {
+public abstract class BaseTcpConnection : IServerConnection {
     /// <summary>
     /// The server that this connection is established to
     /// </summary>
@@ -51,7 +51,7 @@ public abstract class BaseTcpConnection {
     /// <summary>
     /// Attempt to reconnect if no longer connected
     /// </summary>
-    public void ReConnect() {
+    public void Connect() {
         if (!IsConnected) {
             try {
                 client = new TcpClient(Server.Host, Server.Port);

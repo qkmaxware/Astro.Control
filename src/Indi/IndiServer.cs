@@ -49,6 +49,18 @@ public class IndiServer : IServerSpecification {
     /// <param name="conn">connection if successful</param>
     /// <returns>true if connection was successful, false otherwise</returns>
     public bool TryConnect(out IndiConnection conn) {
+        IServerConnection c;
+        var success = TryConnect(out c, null);
+        conn = (IndiConnection)c;
+        return success;
+    }
+
+    /// <summary>
+    /// Try to establish a connection to the INDI server
+    /// </summary>
+    /// <param name="conn">connection if successful</param>
+    /// <returns>true if connection was successful, false otherwise</returns>
+    public bool TryConnect(out IServerConnection conn) {
         return TryConnect(out conn, null);
     }
 
@@ -58,9 +70,9 @@ public class IndiServer : IServerSpecification {
     /// <param name="conn">connection if successful</param>
     /// <param name="listeners">list of INDI listeners to automatically subscribe to the connection if successful</param>
     /// <returns>true if connection was successful, false otherwise</returns>
-    public bool TryConnect(out IndiConnection conn, IndiConnectionEventDispatcher dispatcher) {
+    public bool TryConnect(out IServerConnection conn, IndiConnectionEventDispatcher dispatcher) {
         conn = new IndiConnection(this, dispatcher);
-        conn.ReConnect();
+        conn.Connect();
         if (conn.IsConnected) {
             return true;
         } else {

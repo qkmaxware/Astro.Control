@@ -14,7 +14,13 @@ public interface IServerSpecification {
     /// </summary>
     /// <value>port number</value>
     int Port {get;}
-}
 
+    /// <summary>
+    /// Try to connect to the remote server
+    /// </summary>
+    /// <param name="connection">connection if successful</param>
+    /// <returns>true if connection was successful</returns>
+    bool TryConnect(out IServerConnection connection);
+}
 
 }

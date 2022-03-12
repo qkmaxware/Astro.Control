@@ -5,12 +5,12 @@
 using System;
 using System.Linq;
 
-namespace Qkmaxware.Astro.Control.Controllers {
+namespace Qkmaxware.Astro.Control.Devices {
 
 /// <summary>
 /// Controller abstraction for focuser devices
 /// </summary>
-public class IndiFocuserController : IndiDeviceController {
+public class IndiFocuserController : IndiDeviceController, IFocuser {
 
     public IndiFocuserController(IndiDevice device) : base(device) {}
 

@@ -3,14 +3,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Qkmaxware.Astro.Control.Controllers {
+namespace Qkmaxware.Astro.Control.Devices {
 
 using IndiSwitchVector = IndiVector<IndiSwitchValue>;
 
 /// <summary>
 /// Controller abstraction for CCD devices
 /// </summary>
-public class IndiCameraController : IndiDeviceController {
+public class IndiCameraController : IndiDeviceController, ICamera {
     public IndiCameraController(IndiDevice device) : base(device) {}
 
     public void EnableCooling(bool isCooling) {
@@ -36,7 +36,7 @@ public class IndiCameraController : IndiDeviceController {
 
     public void EnableReceivingImageBlobs(IndiBlobState state = IndiBlobState.Also) {
         var message = new IndiEnableBlobMessage {
-            DeviceName = this.DeviceName,
+            DeviceName = this.Name,
             PropertyName = "CCD1",
             State = state
         };

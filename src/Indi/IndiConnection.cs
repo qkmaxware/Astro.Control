@@ -116,7 +116,7 @@ public class ThreadsafeDeviceCollection: ConcurrentDictionary<string, IndiDevice
 /// <summary>
 /// Connection from client machine to INDI server
 /// </summary>
-public class IndiConnection : BaseTcpConnection {
+public partial class IndiConnection : BaseTcpConnection {
     /// <summary>
     /// Flag to indicate if disconnected devices should be connected automatically when discovered
     /// </summary>

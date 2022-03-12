@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Qkmaxware.Astro.Control.Controllers {
+namespace Qkmaxware.Astro.Control.Devices {
 
 /// <summary>
 /// Base class for wrappers that control INDI devices in particular ways
@@ -13,11 +13,11 @@ public abstract class IndiDeviceController {
     /// <summary>
     /// Name of the controlled INDI device
     /// </summary>
-    public string DeviceName => device.Name;
+    public string Name => device.Name;
     /// <summary>
     /// Port used by the INDI device
     /// </summary>
-    public string DevicePort => device.Port;
+    public string Port => device.Port;
 
     /// <summary>
     /// Create a controller around this given device
@@ -120,7 +120,7 @@ public abstract class IndiDeviceController {
     /// <summary>
     /// Check if the underlying device is connected or not
     /// </summary>
-    public bool IsConnected() => this.device.IsConnected();
+    public bool IsConnected => this.device.IsConnected();
 
     /// <summary>
     /// Connect the underlying device if not connected

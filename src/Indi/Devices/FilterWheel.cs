@@ -3,12 +3,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Qkmaxware.Astro.Control.Controllers {
+namespace Qkmaxware.Astro.Control.Devices {
 
 /// <summary>
 /// Controller abstraction for filter wheels
 /// </summary>
-public class IndiFilterWheelController : IndiDeviceController {
+public class IndiFilterWheelController : IndiDeviceController, IFilterWheel {
     
     /// <summary>
     /// Number of filters in this wheel (optional)

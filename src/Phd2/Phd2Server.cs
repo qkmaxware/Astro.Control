@@ -36,6 +36,18 @@ public class Phd2Server : IServerSpecification {
     /// <param name="conn">connection if successful</param>
     /// <returns>true if connection was successful, false otherwise</returns>
     public bool TryConnect(out Phd2Connection conn) {
+        IServerConnection c;
+        var success = TryConnect(out c, null);
+        conn = (Phd2Connection)c;
+        return success;
+    }
+
+    /// <summary>
+    /// Try to establish a connection to the PHD2 server
+    /// </summary>
+    /// <param name="conn">connection if successful</param>
+    /// <returns>true if connection was successful, false otherwise</returns>
+    public bool TryConnect(out IServerConnection conn) {
         return TryConnect(out conn, null);
     }
 
@@ -45,9 +57,9 @@ public class Phd2Server : IServerSpecification {
     /// <param name="conn">connection if successful</param>
     /// <param name="events">event listeners</param>
     /// <returns>true if connection was successful, false otherwise</returns>
-    public bool TryConnect(out Phd2Connection conn, Phd2ConnectionEventDispatcher events) {
+    public bool TryConnect(out IServerConnection conn, Phd2ConnectionEventDispatcher events) {
         conn = new Phd2Connection(this, events);
-        conn.ReConnect();
+        conn.Connect();
         if (conn.IsConnected) {
             return true;
         } else {

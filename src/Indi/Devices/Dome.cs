@@ -4,12 +4,12 @@
 using System;
 using System.Linq;
 
-namespace Qkmaxware.Astro.Control.Controllers {
+namespace Qkmaxware.Astro.Control.Devices {
 
 /// <summary>
 /// Controller abstraction for dome devices
 /// </summary>
-public class IndiDomeController : IndiDeviceController {
+public class IndiDomeController : IndiDeviceController, IDome {
 
     public IndiDomeController(IndiDevice device) : base(device) {}
     

@@ -1,20 +1,14 @@
 using System;
 using System.Linq;
+using Qkmaxware.Astro.Control.Devices;
 
-namespace Qkmaxware.Astro.Control.Controllers {
+namespace Qkmaxware.Astro.Control.Devices {
 
 /// <summary>
 /// Slew rate abstraction enum
 /// </summary>
 public enum SlewRate {
     Guide, Centering, Find, Max
-}
-
-/// <summary>
-/// Tracking rate abstraction enum
-/// </summary>
-public enum TrackingRate {
-    Sidereal, Solar, Lunar, King, Custom
 }
 
 /// <summary>
@@ -27,7 +21,7 @@ public enum Direction {
 /// <summary>
 /// Controller abstraction for telescope devices
 /// </summary>
-public class IndiTelescopeController : IndiDeviceController {
+public class IndiTelescopeController : IndiDeviceController, ITelescope {
     public IndiTelescopeController(IndiDevice device) : base(device) {}
 
     private string mode;
@@ -50,13 +44,17 @@ public class IndiTelescopeController : IndiDeviceController {
             setMode("SYNC");
     }
 
+    private bool J2000;
+    public void UseJNowCoordinates(bool jnow) {
+        J2000 = !jnow;
+    }
+
     /// <summary>
     /// Synchronize the telescope's orientation (pointing direction) 
     /// </summary>
     /// <param name="ra">current RA angle</param>
     /// <param name="dec">current DEC angle</param>
-    /// <param name="J2000"></param>
-    public void SetOrientation(double ra, double dec, bool J2000 = false) {
+    public void Sync(double ra, double dec) {
         var vector = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>(
             J2000 
             ? IndiStandardProperties.TelescopeJ2000EquatorialCoordinate 
@@ -107,8 +105,7 @@ public class IndiTelescopeController : IndiDeviceController {
     /// </summary>
     /// <param name="raDegrees">desired RA angle</param>
     /// <param name="decDegrees">desired DEC angle</param>
-    /// <param name="J2000"></param>
-    public void Goto(double raDegrees, double decDegrees, bool J2000 = false) {
+    public void Goto(double raDegrees, double decDegrees) {
         var vector = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>(
             J2000 
             ? IndiStandardProperties.TelescopeJ2000EquatorialCoordinate 
@@ -125,8 +122,7 @@ public class IndiTelescopeController : IndiDeviceController {
     /// <param name="raDegrees">desired RA angle</param>
     /// <param name="decDegrees">desired DEC angle</param>
     /// <param name="rate">tracking rate</param>
-    /// <param name="J2000"></param>
-    public void Track(double raDegrees, double decDegrees, TrackingRate rate = TrackingRate.Sidereal, bool J2000 = false) {
+    public void Track(double raDegrees, double decDegrees, TrackingRate rate = TrackingRate.Sidereal) {
         // Set tracking rate
         var rateString = "TRACK_" + rate.ToString().ToUpperInvariant();
         var trackVector = this.GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("TELESCOPE_TRACK_RATE");
