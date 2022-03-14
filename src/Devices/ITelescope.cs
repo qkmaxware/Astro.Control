@@ -1,4 +1,6 @@
 
+using Qkmaxware.Measurement;
+
 namespace Qkmaxware.Astro.Control.Devices {
 
 /// <summary>
@@ -17,14 +19,14 @@ public interface ITelescope : IDevice {
     /// </summary>
     /// <param name="ra">right ascension</param>
     /// <param name="dec">declination</param>
-    void Sync(double ra, double dec);
+    void Sync(Angle ra, Angle dec);
 
     /// <summary>
     /// Automated slew to the given coordinates 
     /// </summary>
     /// <param name="ra">right ascension</param>
     /// <param name="dec">declination</param>
-    void Goto(double ra, double dec);
+    void Goto(Angle ra, Angle dec);
 
     /// <summary>
     /// Automated slew and tracking of the given coordinates 
@@ -32,7 +34,7 @@ public interface ITelescope : IDevice {
     /// <param name="ra">right ascension</param>
     /// <param name="dec">declination</param>
     /// <param name="rate">tracking rate</param>
-    void Track(double ra, double dec, TrackingRate rate);
+    void Track(Angle ra, Angle dec, TrackingRate rate);
 }
 
 }

@@ -218,10 +218,15 @@ public partial class IndiConnection : BaseTcpConnection {
     }
 
     protected override void ConnectionEstablished() {
+        // Send a query properties message once the connection is established
+        this.QueryProperties(); 
+
+        // Trigger a notification
         this.Events.NotifyServerConnected();
     }
 
     protected override void ConnectionClosed() {
+        // Trigger a notification
         this.Events.NotifyServerDisconnected();
     }
 

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Qkmaxware.Measurement;
 
 namespace Qkmaxware.Astro.Control.Devices {
 
@@ -13,11 +14,38 @@ using IndiSwitchVector = IndiVector<IndiSwitchValue>;
 public class IndiCameraController : IndiDeviceController, ICamera {
     public IndiCameraController(IndiDevice device) : base(device) {}
 
-    public void EnableCooling(bool isCooling) {
-        var property = "CCD_COOLER";
-        var vector = GetPropertyOrThrow<IndiSwitchVector>(property);
+    private static readonly string ccd_cooling_property = "CCD_COOLER";
+    /// <summary>
+    /// Test if the camera's cooling is enabled
+    /// </summary>
+    /// <value>true if cooling is enabled</value>
+    public bool IsCoolingEnabled {
+        get {
+            var vector = GetPropertyOrThrow<IndiSwitchVector>(ccd_cooling_property);
+            var on = vector.GetSwitch("COOLER_ON");
+            if (on != null && on.IsOn) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+    private void enableCooling(bool isCooling) {
+        var vector = GetPropertyOrThrow<IndiSwitchVector>(ccd_cooling_property);
         vector.SwitchTo(isCooling ? "COOLER_ON" : "COOLER_OFF");
-        SetProperty(property, vector);
+        SetProperty(ccd_cooling_property, vector);
+    }
+    /// <summary>
+    /// Enable camera sensor cooling
+    /// </summary>
+    public void EnableCooling() {
+        enableCooling(true);
+    }
+    /// <summary>
+    /// Disable camera sensor cooling
+    /// </summary>
+    public void DisableCooling() {
+        enableCooling(false);
     }
 
     public void UseRAW() {
@@ -43,22 +71,15 @@ public class IndiCameraController : IndiDeviceController, ICamera {
         this.SendMessageToDevice(message);
     }
 
-    public void ExposeSync(float seconds) {
-        var property = "CCD_EXPOSURE";
-        var vector = this.GetPropertyOrNew<IndiVector<IndiNumberValue>>(property, () => {
-            var v = new IndiVector<IndiNumberValue>(property);
-            v.Add(new IndiNumberValue { Name = "CCD_EXPOSURE_VALUE", Value = seconds });
-            return v;
-        });
-        vector.GetItemWithName("CCD_EXPOSURE_VALUE").Value = seconds;
+    public CancellationTokenSource Expose(Duration timespan) {
+        double seconds = (double)timespan.TotalSeconds();
 
-        SetProperty(property, vector);
-        Thread.Sleep(TimeSpan.FromSeconds(seconds));
-    }
+        // Enable receiving the image
+        EnableReceivingImageBlobs(IndiBlobState.Also);
 
-    public CancellationTokenSource ExposeAsync(float seconds) {
         var cancel = new CancellationTokenSource();
         Task.Run(() => {
+            // Take the image
             var property = "CCD_EXPOSURE";
             var vector = this.GetPropertyOrNew<IndiVector<IndiNumberValue>>(property, () => {
                 var v = new IndiVector<IndiNumberValue>(property);
@@ -67,6 +88,7 @@ public class IndiCameraController : IndiDeviceController, ICamera {
             });
             vector.GetItemWithName("CCD_EXPOSURE_VALUE").Value = seconds;
 
+            // Wait for the image to be done (or if it is cancelled)
             SetProperty(property, vector);
             var end = DateTime.Now + TimeSpan.FromSeconds(seconds);
             while(DateTime.Now < end) {
@@ -75,6 +97,9 @@ public class IndiCameraController : IndiDeviceController, ICamera {
                     break;
                 }
             }
+
+            // Disable receiving of images
+            EnableReceivingImageBlobs(IndiBlobState.Never);
         });
         return cancel;
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Qkmaxware.Astro.Control.Devices;
+using Qkmaxware.Measurement;
 
 namespace Qkmaxware.Astro.Control.Devices {
 
@@ -54,15 +55,15 @@ public class IndiTelescopeController : IndiDeviceController, ITelescope {
     /// </summary>
     /// <param name="ra">current RA angle</param>
     /// <param name="dec">current DEC angle</param>
-    public void Sync(double ra, double dec) {
+    public void Sync(Angle ra, Angle dec) {
         var vector = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>(
             J2000 
             ? IndiStandardProperties.TelescopeJ2000EquatorialCoordinate 
             : IndiStandardProperties.TelescopeJNowEquatorialCoordinate
         );
         syncNext();
-        vector.GetItemWithName("RA").Value = ra;
-        vector.GetItemWithName("DEC").Value = dec;
+        vector.GetItemWithName("RA").Value = (double)ra.TotalHours();
+        vector.GetItemWithName("DEC").Value = (double)dec.TotalDegrees();
         SetProperty(vector.Name, vector);
     }
 
@@ -103,26 +104,26 @@ public class IndiTelescopeController : IndiDeviceController, ITelescope {
     /// <summary>
     /// Instruct the telescope to slew to the given coordinates
     /// </summary>
-    /// <param name="raDegrees">desired RA angle</param>
-    /// <param name="decDegrees">desired DEC angle</param>
-    public void Goto(double raDegrees, double decDegrees) {
+    /// <param name="ra">desired RA angle</param>
+    /// <param name="dec">desired DEC angle</param>
+    public void Goto(Angle ra, Angle dec) {
         var vector = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>(
             J2000 
             ? IndiStandardProperties.TelescopeJ2000EquatorialCoordinate 
             : IndiStandardProperties.TelescopeJNowEquatorialCoordinate
         );
         slewNext();
-        vector.GetItemWithName("RA").Value = raDegrees;
-        vector.GetItemWithName("DEC").Value = decDegrees;
+        vector.GetItemWithName("RA").Value = (double)ra.TotalHours();
+        vector.GetItemWithName("DEC").Value = (double)dec.TotalDegrees();
         SetProperty(vector.Name, vector);
     }
     /// <summary>
     /// Instruct the telescope to slew to the given coordinates and track the object
     /// </summary>
-    /// <param name="raDegrees">desired RA angle</param>
-    /// <param name="decDegrees">desired DEC angle</param>
+    /// <param name="ra">desired RA angle</param>
+    /// <param name="dec">desired DEC angle</param>
     /// <param name="rate">tracking rate</param>
-    public void Track(double raDegrees, double decDegrees, TrackingRate rate = TrackingRate.Sidereal) {
+    public void Track(Angle ra, Angle dec, TrackingRate rate = TrackingRate.Sidereal) {
         // Set tracking rate
         var rateString = "TRACK_" + rate.ToString().ToUpperInvariant();
         var trackVector = this.GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("TELESCOPE_TRACK_RATE");
@@ -138,8 +139,8 @@ public class IndiTelescopeController : IndiDeviceController, ITelescope {
             : IndiStandardProperties.TelescopeJNowEquatorialCoordinate
         );
         trackNext();
-        posVector.GetItemWithName("RA").Value = raDegrees;
-        posVector.GetItemWithName("DEC").Value = decDegrees;
+        posVector.GetItemWithName("RA").Value = (double)ra.TotalHours();
+        posVector.GetItemWithName("DEC").Value = (double)dec.TotalDegrees();
         SetProperty(posVector);
     }
 }

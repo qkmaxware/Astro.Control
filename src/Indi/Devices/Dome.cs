@@ -3,6 +3,7 @@
 
 using System;
 using System.Linq;
+using Qkmaxware.Measurement;
 
 namespace Qkmaxware.Astro.Control.Devices {
 
@@ -12,25 +13,33 @@ namespace Qkmaxware.Astro.Control.Devices {
 public class IndiDomeController : IndiDeviceController, IDome {
 
     public IndiDomeController(IndiDevice device) : base(device) {}
-    
+
     /// <summary>
-    /// Check or set if the dome's shutter is open or closed
+    /// Check if the shutter is open
     /// </summary>
-    /// <value>true if the dome's shutter is open</value>
+    /// <value>true if the shutter is open</value>
     public bool IsShutterOpen {
         get {
             var vec = GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("DOME_SHUTTER");
             var open = vec?.GetItemWithName("SHUTTER_OPEN");
             return open != null && open.IsOn;
-        } set {
-            var vec = GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("DOME_SHUTTER");
-            if (value) {
-                vec.SwitchTo("SHUTTER_OPEN");
-            } else {
-                vec.SwitchTo("SHUTTER_CLOSE");
-            }
-            SetProperty(vec);
         }
+    }
+    /// <summary>
+    /// Open the dome's shutter
+    /// </summary>
+    public void OpenShutter() {
+        var vec = GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("DOME_SHUTTER");
+        vec.SwitchTo("SHUTTER_OPEN");
+        SetProperty(vec);
+    }
+    /// <summary>
+    /// Close the dome's shutter
+    /// </summary>
+    public void CloseShutter() {
+        var vec = GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("DOME_SHUTTER");
+        vec.SwitchTo("SHUTTER_CLOSE");
+        SetProperty(vec);
     }
 
     /// <summary>
@@ -47,27 +56,45 @@ public class IndiDomeController : IndiDeviceController, IDome {
     }
 
     /// <summary>
-    /// Start rotating the dome clockwise at set speed
+    /// Move the dome to the given azimuthal angle
     /// </summary>
-    public void StartRotatingClockwise() {
+    /// <param name="rpm">rotations per minute</param>
+    /// <param name="angle">current rotation angle</param>
+    public void Goto(double rpm, Angle angle) {
+        var vec = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>("ABS_DOME_POSITION");
+        var pos = vec.GetItemWithName("DOME_ABSOLUTE_POSITION");
+        if (pos != null) {
+            this.SetSpeed(rpm);
+            pos.Value = (double)angle.TotalDegrees();
+            SetProperty(vec);
+        }
+    }
+    /// <summary>
+    /// Begin rotating the dome clockwise
+    /// </summary>
+    /// <param name="rpm">rotations per minute</param>
+    public void RotateCW(double rpm) {
+        this.SetSpeed(rpm);
+
         var vec = this.GetPropertyOrThrow<IndiVector<IndiSwitchValue>>("DOME_MOTION");
         vec.SwitchTo("DOME_CW");
         SetProperty(vec);
     }
-
     /// <summary>
-    /// Start rotating the dome counter clockwise at set speed
+    /// Begin rotating the dome counter clockwise
     /// </summary>
-    public void StartRotatingCClockwise() {
+    /// <param name="rpm">rotations per minute</param>
+    public void RotateCCW(double rpm) {
+        this.SetSpeed(rpm);
+
         var vec = this.GetPropertyOrThrow<IndiVector<IndiSwitchValue>>("DOME_MOTION");
         vec.SwitchTo("DOME_CW");
         SetProperty(vec);
     }
-
     /// <summary>
-    /// Stop rotating the dome
+    /// Stop all rotations
     /// </summary>
-    public void StopRotating() {
+    public void Stop() {
         var vec = this.GetPropertyOrThrow<IndiVector<IndiSwitchValue>>("DOME_ABORT_MOTION");
         vec.SwitchTo("ABORT");
         SetProperty(vec);
