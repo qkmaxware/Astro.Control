@@ -25,6 +25,11 @@ public interface IDome : IDevice {
 
     #region Rotation
     /// <summary>
+    /// The current direction the dome is pointing
+    /// </summary>
+    /// <value>direction</value>
+    Angle PointingDirection {get;}
+    /// <summary>
     /// Move the dome to the given azimuthal angle
     /// </summary>
     /// <param name="rpm">rotations per minute</param>

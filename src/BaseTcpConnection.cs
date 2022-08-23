@@ -20,6 +20,12 @@ public abstract class BaseTcpConnection : IServerConnection {
     private StreamWriter writer;
 
     /// <summary>
+    /// Get or set a logger for the given connection
+    /// </summary>
+    /// <value>logger</value>
+    public IConnectionLogger InputLogger {get;set;}
+
+    /// <summary>
     /// Check if the connection is active
     /// </summary>
     public bool IsConnected => client != null && client.Connected;

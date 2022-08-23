@@ -6,24 +6,21 @@ using Qkmaxware.Measurement;
 namespace Qkmaxware.Astro.Control.Devices {
 
 /// <summary>
-/// Slew rate abstraction enum
-/// </summary>
-public enum SlewRate {
-    Guide, Centering, Find, Max
-}
-
-/// <summary>
-/// Direction enum
-/// </summary>
-public enum Direction {
-    None, North, South, East, West, NorthEast, NorthWest, SouthEast, SouthWest
-}
-
-/// <summary>
 /// Controller abstraction for telescope devices
 /// </summary>
 public class IndiTelescopeController : IndiDeviceController, ITelescope {
     public IndiTelescopeController(IndiDevice device) : base(device) {}
+
+    /// <summary>
+    /// The current right ascension of the telescope
+    /// </summary>
+    /// <returns></returns>
+    public Angle RightAscension => Angle.Hours(this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>(IndiStandardProperties.TelescopeJNowEquatorialCoordinate)?.GetItemWithName("RA")?.Value ?? 0);
+    /// <summary>
+    /// The current declination of the telescope
+    /// </summary>
+    /// <returns></returns>
+    public Angle Declination => Angle.Degrees(this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>(IndiStandardProperties.TelescopeJNowEquatorialCoordinate)?.GetItemWithName("DEC")?.Value ?? 0);
 
     private string mode;
     private void setMode(string mode) {
@@ -68,37 +65,31 @@ public class IndiTelescopeController : IndiDeviceController, ITelescope {
     }
 
     /// <summary>
-    /// Set the telescope's slew rate
+    /// Begin rotating the telescope in the desired direction
     /// </summary>
-    /// <param name="rate">speed</param>
-    public void SetSlewRate(SlewRate rate) {
-        var vector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeSlewRate);
-        var index = (int)(((int)rate / 3f) * (vector.Count - 1)); 
-        vector.SwitchTo(index);
-        SetProperty(vector.Name, vector);
-    }
+    /// <param name="horizontal">horizontal axis input</param>
+    /// <param name="vertical">vertical axis input</param>
+    public void Rotate(float horizontal, float vertical) {
+        var hDir = MathF.Sign(horizontal);
+        var yDir = MathF.Sin(vertical);
+        var speed = MathF.Max(MathF.Min(1, MathF.Sqrt(horizontal * horizontal + vertical * vertical)), 0); // 0 to 1 speed
 
-    /// <summary>
-    /// Stop the current rotation
-    /// </summary>
-    public void StopRotation() {
-        StartRotating(Direction.None);
-    }
+        // Set speed
+        var speedVector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeSlewRate);
+        var index = (int)(speed * (speedVector.Count - 1));  // 0 to index
+        speedVector.SwitchTo(index);
+        SetProperty(speedVector);
 
-    /// <summary>
-    /// Begin telescope rotation in the given direction
-    /// </summary>
-    /// <param name="motion">direction of rotation</param>
-    public void StartRotating(Direction motion) {
-        var vector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeMotionWestEast);
-        vector.GetSwitch("MOTION_WEST").Value = motion == Direction.West || motion == Direction.NorthWest || motion == Direction.SouthWest;
-        vector.GetSwitch("MOTION_EAST").Value = motion == Direction.East || motion == Direction.NorthEast || motion == Direction.SouthEast;
-        SetProperty(vector.Name, vector);
+        // Set direction
+        var dirVector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeMotionWestEast);
+        dirVector.GetSwitch("MOTION_WEST").Value = hDir < 0;
+        dirVector.GetSwitch("MOTION_EAST").Value = hDir > 0;
+        SetProperty(dirVector);
 
-        vector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeMotionNorthSouth);
-        vector.GetSwitch("MOTION_NORTH").Value = motion == Direction.North || motion == Direction.NorthEast || motion == Direction.NorthWest;
-        vector.GetSwitch("MOTION_SOUTH").Value = motion == Direction.South || motion == Direction.SouthEast || motion == Direction.SouthWest;
-        SetProperty(vector.Name, vector);
+        dirVector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeMotionNorthSouth);
+        dirVector.GetSwitch("MOTION_NORTH").Value = yDir > 0;
+        dirVector.GetSwitch("MOTION_SOUTH").Value = yDir < 0;
+        SetProperty(dirVector);
     }
 
     /// <summary>

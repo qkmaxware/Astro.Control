@@ -40,11 +40,6 @@ public class JsonRpcClient : BaseTcpConnection {
 
     }
 
-    /// <summary>
-    /// Output stream to print all received messages to
-    /// </summary>
-    public TextWriter OutputStream;
-
     public JsonRpcClient(IServerSpecification server) : base(server) {}
 
     private static int bufferSize = 1000;
@@ -77,8 +72,9 @@ public class JsonRpcClient : BaseTcpConnection {
             if (depth == 0 && buffer.Length > 0) {
                 try {
                     var json = buffer.ToString();                   // Get json
-                    if (this.OutputStream != null)
-                        this.OutputStream.Write(json);              // Redirect received messages
+                    if (this.InputLogger != null) {
+                        this.InputLogger.Write(json);               // Redirect received messages
+                    }
                     var obj = JsonDocument.Parse(json);             // Parse the object
                     Task.Run(() => process(obj.RootElement));       // Process the message on a new thread
                     buffer.Clear();                                 // Clear the buffer to prepare for future objects

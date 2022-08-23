@@ -5,6 +5,7 @@ using Qkmaxware.Astro.Control.Devices;
 namespace Qkmaxware.Astro.Control {
 
 public partial class IndiConnection : IDeviceSource {
+    public IEnumerable<IDevice> EnumerateAllDevices() => this.Devices.AllDevices();
     /// <summary>
     /// List all camera that are available for control via this source
     /// </summary>

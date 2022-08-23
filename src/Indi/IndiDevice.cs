@@ -9,6 +9,7 @@ using System.Xml.Linq;
 using System.Dynamic;
 using System.Collections.Generic;
 using System.Collections;
+using Qkmaxware.Astro.Control.Devices;
 
 namespace Qkmaxware.Astro.Control {
 
@@ -84,7 +85,7 @@ public class IndiPropertiesContainer : IEnumerable<KeyValuePair<string, IndiValu
         if (this.Exists(property)) {
             var t = this.Get(property);
             if (t is T) {
-                value = (T)this.Get(property);
+                value = (T)t;
                 return true;
             } else {
                 return false;
@@ -132,14 +133,16 @@ public class IndiPropertiesContainer : IEnumerable<KeyValuePair<string, IndiValu
     /// <value>property value</value>
     public IndiValue this[string key] {
         get => Get(key);
-        internal set => properties[key] = value;
+        internal set {
+            properties[key] = value;
+        }
     }
 }
 
 /// <summary>
 /// Abstraction for a device accessible over an INDI connection
 /// </summary>
-public class IndiDevice {
+public class IndiDevice : IDevice {
     /// <summary>
     /// Name of the device
     /// </summary>
@@ -149,7 +152,7 @@ public class IndiDevice {
     /// Properties associated with this device
     /// </summary>
     /// <returns>property container</returns>
-    public IndiPropertiesContainer Properties {get; private set;}
+    public IndiDevicePropertiesWrapper Properties {get; private set;}
 
     /// <summary>
     /// The connection this device can be accessed over
@@ -164,19 +167,21 @@ public class IndiDevice {
     public IndiDevice(string name, IndiConnection connection) {
         this.Name = name;
         this.Connection = connection;
-        this.Properties = new IndiPropertiesContainer(this);
+        this.Properties = new IndiDevicePropertiesWrapper(connection, name);
     }
 
     /// <summary>
     /// Test if this device is connected
     /// </summary>
     /// <returns>true if the device is connected</returns>
-    public bool IsConnected() {
-        IndiVector<IndiSwitchValue> vector;
-        if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
-            return vector.GetSwitch("CONNECT")?.IsOn ?? false;
-        } else {
-            return false;
+    public bool IsConnected {
+        get {
+            IndiVector<IndiSwitchValue> vector;
+            if (this.Properties.TryGetValue<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
+                return vector.GetSwitch("CONNECT")?.IsOn ?? false;
+            } else {
+                return false;
+            }
         }
     }
 
@@ -185,14 +190,14 @@ public class IndiDevice {
     /// </summary>
     public void Connect() {
         IndiVector<IndiSwitchValue> vector;
-        if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
+        if (this.Properties.TryGetValue<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
             var connect = vector.GetSwitch("CONNECT");
             if (connect != null && !connect.IsOn) {
                 // Only connect if not already connected
                 foreach (var toggle in vector) {
                     toggle.Value = toggle == connect;
                 }
-                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.SetRemoteValue(vector.Name, vector);
                 this.Properties.RefreshAsync();
             }
         }
@@ -203,14 +208,14 @@ public class IndiDevice {
     /// </summary>
     public void Disconnect() {
         IndiVector<IndiSwitchValue> vector;
-        if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
+        if (this.Properties.TryGetValue<IndiVector<IndiSwitchValue>>(IndiStandardProperties.Connection, out vector)) {
             var disconnect = vector.GetSwitch("CONNECT");
             if (disconnect != null && !disconnect.IsOn) {
                 // Only disconnect if not already disconnected
                 foreach (var toggle in vector) {
                     toggle.Value = toggle == disconnect;
                 }
-                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.SetRemoteValue(vector.Name, vector);
                 this.Properties.RefreshAsync();
             }
         }
@@ -224,7 +229,7 @@ public class IndiDevice {
     public string Port {
         get {
             IndiVector<IndiTextValue> vector;
-            if (this.Properties.TryGet<IndiVector<IndiTextValue>>("DEVICE_PORT", out vector)) {
+            if (this.Properties.TryGetValue<IndiVector<IndiTextValue>>("DEVICE_PORT", out vector)) {
                 return vector.GetItemWithName("PORT")?.Value;
             } else {
                 return null;
@@ -234,12 +239,12 @@ public class IndiDevice {
                 return;
 
             IndiVector<IndiTextValue> vector;
-            if (this.Properties.TryGet<IndiVector<IndiTextValue>>("DEVICE_PORT", out vector)) {
+            if (this.Properties.TryGetValue<IndiVector<IndiTextValue>>("DEVICE_PORT", out vector)) {
                 var portItem = vector.GetItemWithName("PORT");
                 if (portItem != null)
                     portItem.Value = value;
 
-                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.SetRemoteValue(vector.Name, vector);
             } 
         }
     }
@@ -251,7 +256,7 @@ public class IndiDevice {
     public int? BaudRate {
         get {
             IndiVector<IndiSwitchValue> vector;
-            if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>("DEVICE_BAUD_RATE", out vector)) {
+            if (this.Properties.TryGetValue<IndiVector<IndiSwitchValue>>("DEVICE_BAUD_RATE", out vector)) {
                 var enabled = vector.GetFirstEnabledSwitch();
                 if (enabled == null) {
                     return null;
@@ -273,9 +278,9 @@ public class IndiDevice {
 
             var strValue = value.Value.ToString();
             IndiVector<IndiSwitchValue> vector;
-            if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>("DEVICE_BAUD_RATE", out vector)) {
+            if (this.Properties.TryGetValue<IndiVector<IndiSwitchValue>>("DEVICE_BAUD_RATE", out vector)) {
                 vector.SwitchTo(strValue);
-                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.SetRemoteValue(vector.Name, vector);
             }
         }
     }
@@ -286,7 +291,7 @@ public class IndiDevice {
     public IEnumerable<int> AvailableBaudRates {
         get {
             IndiVector<IndiSwitchValue> vector;
-            if (this.Properties.TryGet<IndiVector<IndiSwitchValue>>("DEVICE_BAUD_RATE", out vector)) {
+            if (this.Properties.TryGetValue<IndiVector<IndiSwitchValue>>("DEVICE_BAUD_RATE", out vector)) {
                 foreach (var swch in vector) {
                     int rate;
                     if (int.TryParse(swch.Name, out rate)) {
@@ -302,12 +307,12 @@ public class IndiDevice {
     /// </summary>
     public void SetClock(DateTime time) {
         IndiVector<IndiTextValue> vector;
-        if (this.Properties.TryGet<IndiVector<IndiTextValue>>(IndiStandardProperties.Connection, out vector)) {
+        if (this.Properties.TryGetValue<IndiVector<IndiTextValue>>(IndiStandardProperties.Connection, out vector)) {
             if (vector.IsWritable) {
                 vector.GetItemWithName("UTC").Value = time.ToUniversalTime().ToString("o");
                 vector.GetItemWithName("OFFSET").Value = TimeZoneInfo.Local.GetUtcOffset(time).TotalHours.ToString();
                 
-                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.SetRemoteValue(vector.Name, vector);
             }
         }
     }
@@ -322,18 +327,36 @@ public class IndiDevice {
         lat = Math.Min(90, Math.Max(-90, lat)); //clamp between -90 and 90
         lon = (lon - (Math.Floor( lon / 360 ) * 360 )) + 0; // normalize between 0 and 360
         IndiVector<IndiNumberValue> vector;
-        if (this.Properties.TryGet<IndiVector<IndiNumberValue>>(IndiStandardProperties.Connection, out vector)) {
+        if (this.Properties.TryGetValue<IndiVector<IndiNumberValue>>(IndiStandardProperties.Connection, out vector)) {
             if (vector.IsWritable) {
                 vector.GetItemWithName("LAT").Value = lat;
                 vector.GetItemWithName("LONG").Value = lon;
                 vector.GetItemWithName("ELEV").Value = Math.Max(0, alt);
 
-                this.Properties.SetAsync(vector.Name, vector);
+                this.Properties.SetRemoteValue(vector.Name, vector);
             }
         }
     }
 
     #endregion
-}   
+
+    // override object.Equals
+    public override bool Equals(object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (obj is IndiDevice other) {
+            return other.Connection == this.Connection && other.Name == this.Name;
+        }
+        else {
+            return base.Equals(obj);
+        }
+    }
+    
+    // override object.GetHashCode
+    public override int GetHashCode() {
+        return HashCode.Combine(this.Name, this.Connection);
+    }
+}
 
 }

@@ -1,30 +1,73 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using static Qkmaxware.Astro.Control.IndiConnectionEventDispatcher;
 
 namespace Qkmaxware.Astro.Control.Devices {
 
 /// <summary>
 /// Base class for wrappers that control INDI devices in particular ways
 /// </summary>
-public abstract class IndiDeviceController {
+public abstract class IndiDeviceController : IDevice, IHasPortDetails, IHasCommunicationsDetails {
 
-    private IndiDevice device;
+    private IndiConnection connection {get; set;}
+    private IndiDevice device {get;set;}
+
     /// <summary>
     /// Name of the controlled INDI device
     /// </summary>
-    public string Name => device.Name;
+    public string Name {get; private set;}
     /// <summary>
     /// Port used by the INDI device
     /// </summary>
-    public string Port => device.Port;
+    public string Port {
+        get => device.Port;
+        set => device.Port = value;
+    }
+    /// <summary>
+    /// Communication baud rate
+    /// </summary>
+    public int? BaudRate {
+        get => device.BaudRate;
+        set => device.BaudRate = value;   
+    }
+    /// <summary>
+    /// Enumerate over valid baud rates for the given device
+    /// </summary>
+    /// <returns>enumerable of baud rates</returns>
+    public IEnumerable<int> EnumerateBaudRates() => device.AvailableBaudRates;
 
     /// <summary>
     /// Create a controller around this given device
     /// </summary>
     /// <param name="device">device</param>
     public IndiDeviceController(IndiDevice device) {
+        this.Name = device.Name;
+        this.connection = device.Connection;
         this.device = device;
+    }
+
+    protected Task AwaitPropertyChange(string property) {
+        return Task.Run(async () => {
+            // Configure delay task
+            bool spin = true;
+            SetPropertyListener listener = (device, changed, from, to) => {
+                if (this.device == device && property == changed) {
+                    // Property on the given device is changed, we don't care what it was changed to. 
+                    spin = false;
+                }
+            };
+            this.connection.Events.OnPropertyChanged += listener;
+            
+            // Spin wait
+            while (spin) {
+                await Task.Delay(100); // Wait 100ms between checks
+            }
+
+            // Cleanup
+            this.connection.Events.OnPropertyChanged -= listener;
+        });
     }
 
     /// <summary>
@@ -33,7 +76,8 @@ public abstract class IndiDeviceController {
     /// <param name="name">name of the property</param>
     /// <returns>true if the device has a property with the given name</returns>
     protected bool HasProperty(string name) {
-        return this.device != null && this.device.Properties != null && this.device.Properties.Exists(name);
+        var device = this.device;
+        return device != null && device.Properties != null && device.Properties.Exists(name);
     }
 
     /// <summary>
@@ -44,7 +88,7 @@ public abstract class IndiDeviceController {
     /// <returns>property if the property exists and is of the given type</returns>
     protected T GetPropertyOrThrow<T>(string prop) where T:IndiValue {
         T value = default(T);
-        if (device.Properties.TryGet<T>(prop, out value)) {
+        if (device.Properties.TryGetValue<T>(prop, out value)) {
             return value;
         } else {
             throw new System.ArgumentException($"Device property '{prop}' is missing or not of type {typeof(T).Name}");
@@ -59,7 +103,7 @@ public abstract class IndiDeviceController {
     /// <returns>property if the property exists and is of the given type</returns>
     protected T GetPropertyOrDefault<T>(string prop) where T:IndiValue {
         T value = default(T);
-        if (device.Properties.TryGet<T>(prop, out value)) {
+        if (device.Properties.TryGetValue<T>(prop, out value)) {
             return value;
         } else {
             return default(T);
@@ -75,7 +119,7 @@ public abstract class IndiDeviceController {
     /// <returns>property if the property exists and is of the given type or a new value created from the factory</returns>
     protected T GetPropertyOrNew<T>(string prop, Func<T> factory) where T:IndiValue {
         T value = default(T);
-        if (device.Properties.TryGet<T>(prop, out value)) {
+        if (device.Properties.TryGetValue<T>(prop, out value)) {
             return value;
         } else {
             var created = factory();
@@ -91,7 +135,7 @@ public abstract class IndiDeviceController {
     /// <param name="vector">value to change it to</param>
     protected void SetProperty(string property, IndiValue vector) {
         if (vector != null && !string.IsNullOrEmpty(property))
-            this.device.Properties.SetAsync(property, vector);
+            this.device.Properties.SetRemoteValue(property, vector);
     }
     
     /// <summary>
@@ -120,7 +164,7 @@ public abstract class IndiDeviceController {
     /// <summary>
     /// Check if the underlying device is connected or not
     /// </summary>
-    public bool IsConnected => this.device.IsConnected();
+    public bool IsConnected => this.device.IsConnected;
 
     /// <summary>
     /// Connect the underlying device if not connected

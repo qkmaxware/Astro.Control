@@ -15,6 +15,24 @@ public enum TrackingRate {
 /// </summary>
 public interface ITelescope : IDevice {
     /// <summary>
+    /// The current right ascension of the telescope
+    /// </summary>
+    /// <returns></returns>
+    Angle RightAscension {get;}
+    /// <summary>
+    /// The current declination of the telescope
+    /// </summary>
+    /// <returns></returns>
+    Angle Declination {get;}
+
+    /// <summary>
+    /// Begin rotating the telescope in the desired direction
+    /// </summary>
+    /// <param name="horizontal">horizontal axis input</param>
+    /// <param name="vertical">vertical axis input</param>
+    void Rotate(float horizontal, float vertical);
+
+    /// <summary>
     /// Synchronize the orientation of the telescope to the given coordinates
     /// </summary>
     /// <param name="ra">right ascension</param>

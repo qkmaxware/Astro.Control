@@ -15,105 +15,6 @@ using System.Threading;
 namespace Qkmaxware.Astro.Control {
 
 /// <summary>
-/// A thread safe collection of indi devices
-/// </summary>
-public class ThreadsafeDeviceCollection: ConcurrentDictionary<string, IndiDevice> {
-
-    /// <summary>
-    /// Fetch a device with the given name or null if the device does not exist
-    /// </summary>
-    /// <param name="name">device name</param>
-    /// <returns>device or null if no device with the given name exists</returns>
-    public IndiDevice GetDeviceByNameOrNull(string name) {
-        IndiDevice device;
-        if (this.TryGetValue(name, out device)) {
-            return device;
-        } else {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Fetch a device with the given name or throw exception
-    /// </summary>
-    /// <param name="name">device name</param>
-    /// <returns>device</returns>
-    public IndiDevice GetDeviceByNameOrThrow(string name) {
-        IndiDevice device;
-        if (this.TryGetValue(name, out device)) {
-            return device;
-        } else {
-            throw new ArgumentException($"Device '{name}' not found over this connection");
-        }
-    }
-
-    /// <summary>
-    /// All devices on this server
-    /// </summary>
-    /// <returns>list of devices</returns>
-    public IEnumerable<IndiDevice> AllDevices() {
-        return this.Values;
-    }
-
-    /// <summary>
-    /// All devices currently with an established connection
-    /// </summary>
-    /// <returns>list of devices</returns>
-    public IEnumerable<IndiDevice> ConnectedDevices() {
-        return this.AllDevices().Where(device => device.IsConnected());
-    }
-
-    /// <summary>
-    /// All devices currently without an established connection
-    /// </summary>
-    /// <returns>list of devices</returns>
-    public IEnumerable<IndiDevice> DisconnectedDevices() {
-        return this.AllDevices().Where(device => !device.IsConnected());
-    }
-
-    /// <summary>
-    /// All telescopes on this server as identified by the INDI property "TELESCOPE_INFO" 
-    /// </summary>
-    /// <returns>list of devices</returns>
-    public IEnumerable<IndiDevice> AllTelescopes() {
-        return AllDevices().Where((d) => d.Properties.Exists("TELESCOPE_INFO"));
-    }
-
-    /// <summary>
-    /// All CCD devices on this server as identified by the INDI property "CCD_INFO" 
-    /// </summary>
-    /// <returns>list of devices</returns>
-    public IEnumerable<IndiDevice> AllCCDs() {
-        return AllDevices().Where((d) => d.Properties.Exists("CCD_INFO"));
-    }
-
-    /// <summary>
-    /// All filter wheel devices on this server as identified by the INDI property "FILTER_SLOT" 
-    /// </summary>
-    /// <returns>list of devices</returns>
-    public IEnumerable<IndiDevice> AllFilterWheels() {
-        return AllDevices().Where((d) => d.Properties.Exists("FILTER_SLOT"));
-    }
-
-    /// <summary>
-    /// All focuser devices on this server as identified by the INDI property "FOCUS_MOTION" 
-    /// </summary>
-    /// <returns>list of devices</returns>
-    public IEnumerable<IndiDevice> AllFocusers() {
-        return AllDevices().Where((d) => d.Properties.Exists("FOCUS_MOTION"));
-    }
-
-    /// <summary>
-    /// All observation domes on this server as identified by the INDI property "DOME_MEASUREMENTS" 
-    /// </summary>
-    /// <returns>list of devices</returns>
-    public IEnumerable<IndiDevice> AllDomes() {
-        return AllDevices().Where((d) => d.Properties.Exists("DOME_MEASUREMENTS"));
-    }
-}
-
-
-/// <summary>
 /// Connection from client machine to INDI server
 /// </summary>
 public partial class IndiConnection : BaseTcpConnection {
@@ -124,17 +25,12 @@ public partial class IndiConnection : BaseTcpConnection {
     public bool AutoConnectDevices {get; set;}
 
     /// <summary>
-    /// Output stream to print all received messages to
-    /// </summary>
-    public TextWriter OutputStream;
-
-    /// <summary>
     /// Devices acquired from this connection
     /// </summary>
     /// <typeparam name="string">device name</typeparam>
     /// <typeparam name="IndiDevice">device</typeparam>
     /// <returns>all devices</returns>
-    public ThreadsafeDeviceCollection Devices {get; private set;} = new ThreadsafeDeviceCollection();
+    public IndiDeviceCollection Devices {get; private set;}
 
     /// <summary>
     /// Event dispatcher which can have its events subscribed to by listeners
@@ -145,6 +41,7 @@ public partial class IndiConnection : BaseTcpConnection {
     internal IndiConnection (IndiServer server, IndiConnectionEventDispatcher eventDispatcher = null) : base(server) {
         var builder = new UriBuilder();
         this.Events = eventDispatcher ?? new IndiConnectionEventDispatcher();
+        this.Devices = new IndiDeviceCollection(this);
     }
 
     ~IndiConnection() {
@@ -152,58 +49,14 @@ public partial class IndiConnection : BaseTcpConnection {
     }
 
     /// <summary>
-    /// Add a device to this connection
-    /// </summary>
-    /// <param name="device">device</param>
-    public void AddDevice(IndiDevice device) {
-        this.Devices.AddOrUpdate(device.Name, device, (key, old) => device);
-        this.Events.NotifyDeviceFound(device);
-    }
-
-    /// <summary>
-    /// Remove device from this connection
-    /// </summary>
-    /// <param name="device">device</param>
-    public void RemoveDevice(IndiDevice device) {
-        IndiDevice deleted;
-        if(this.Devices.TryRemove(device.Name, out deleted)) {
-            this.Events.NotifyDeviceFound(deleted);
-        }
-    }
-
-    /// <summary>
-    /// Remove a device with the given name
-    /// </summary>
-    /// <param name="name">name of device</param>
-    public void RemoveDeviceByName(string name) {
-        RemoveDevice(GetDeviceByName(name));
-    }
-
-    /// <summary>
-    /// Get a device with the given name
-    /// </summary>
-    /// <param name="name">name of device</param>
-    /// <returns>device or null</returns>
-    public IndiDevice GetDeviceByName(string name) {
-        if (string.IsNullOrEmpty(name))
-            return null;
-        
-        IndiDevice device;
-        if (Devices.TryGetValue(name, out device)) {
-            return device;
-        } else {
-            return null;
-        }
-    }
-
-    /// <summary>
     /// Get a device with the given name, or create it if it doesn't exist
     /// </summary>
     /// <param name="name">name of device</param>
     /// <returns>existing or new device</returns>
-    public IndiDevice GetOrCreateDevice(string name) {
+    internal IndiDevice GetOrCreateDevice(string name) {
         int b4 = Devices.Count;
-        var device = Devices.GetOrAdd(name, new IndiDevice(name, this));
+        this.Devices.ReserveDeviceNameIfNotExists(name);
+        var device = new IndiDevice(name, this);
         if (Devices.Count > b4) {
             this.Events.NotifyDeviceFound(device);
         }
@@ -250,7 +103,7 @@ public partial class IndiConnection : BaseTcpConnection {
             // Dispatch different events based on the message type
             try {
                 // In case of change events, store a reference to the old value before doing the update
-                IndiValue old = message is IndiSetPropertyMessage setter ? this.GetDeviceByName(setter.DeviceName)?.Properties?.Get(setter.PropertyName) : null;
+                IndiValue old = message is IndiSetPropertyMessage setter ? this.Devices.GetDeviceByNameOrNull(setter.DeviceName)?.Properties?.GetValueOrNull(setter.PropertyName) : null;
                 
                 // Actually do the correct action based on the message
                 message.Process(this);
@@ -261,7 +114,7 @@ public partial class IndiConnection : BaseTcpConnection {
                 // Specific notification based on message type
                 switch (message) {
                     case IndiSetPropertyMessage smsg: {
-                        var device = this.GetDeviceByName(smsg.DeviceName);
+                        var device = this.Devices.GetDeviceByNameOrNull(smsg.DeviceName);
                         this.Events.NotifyPropertyChanged(
                             device, 
                             smsg.PropertyName,
@@ -271,17 +124,17 @@ public partial class IndiConnection : BaseTcpConnection {
                         break;
                     }
                     case IndiDefinePropertyMessage dmsg: {
-                        var device = this.GetDeviceByName(dmsg.DeviceName);
+                        var device = this.Devices.GetDeviceByNameOrNull(dmsg.DeviceName);
                         this.Events.NotifyPropertyCreated(device, dmsg.PropertyName, dmsg.PropertyValue);
                         break;   
                     }
                     case IndiDeletePropertyMessage delmsg: {
-                        var device = this.GetDeviceByName(delmsg.DeviceName);
-                        this.Events.NotifyPropertyDeleted(device, delmsg.PropertyName, device.Properties.Get(delmsg.PropertyName));
+                        var device = this.Devices.GetDeviceByNameOrNull(delmsg.DeviceName);
+                        this.Events.NotifyPropertyDeleted(device, delmsg.PropertyName, device.Properties?.GetValueOrNull(delmsg.PropertyName));
                         break; 
                     }
                     case IndiNotificationMessage note: {
-                        var device = this.GetDeviceByName(note.DeviceName);
+                        var device = this.Devices.GetDeviceByNameOrNull(note.DeviceName);
                         this.Events.Notify(device, note.Message);
                         break;
                     }
@@ -294,7 +147,7 @@ public partial class IndiConnection : BaseTcpConnection {
             if (message is IndiDefinePropertyMessage propDef) {
                 if (this.AutoConnectDevices && !string.IsNullOrEmpty(propDef.DeviceName) && propDef.PropertyName == IndiStandardProperties.Connection) {
                     IndiDevice device;
-                    if(this.Devices.TryGetValue(propDef.DeviceName, out device)) {
+                    if(this.Devices.TryGetDeviceByName(propDef.DeviceName, out device)) {
                         device.Connect();
                     }
                 }
@@ -323,8 +176,8 @@ public partial class IndiConnection : BaseTcpConnection {
                 if (bytesRead > 0) {
                     var str = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                     message.Append(str);
-                    if (OutputStream != null) {
-                        OutputStream.Write(str);
+                    if (InputLogger != null) {
+                        InputLogger.Write(str);
                     }
 
                     var xml = message.ToString();

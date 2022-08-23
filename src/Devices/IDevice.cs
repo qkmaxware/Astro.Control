@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Qkmaxware.Astro.Control.Devices {
 
 /// <summary>
@@ -27,6 +29,28 @@ public interface IDevice {
     /// </summary>
     void Disconnect();
     #endregion
+}
+
+/// <summary>
+/// A generic device that has communicate details
+/// </summary>
+public interface IHasPortDetails{
+    /// <summary>
+    /// Port used by the INDI device
+    /// </summary>
+    public string Port {get; set;}
+}
+
+public interface IHasCommunicationsDetails {
+    /// <summary>
+    /// Communication baud rate
+    /// </summary>
+    int? BaudRate {get; set;}
+    /// <summary>
+    /// Enumerate over valid baud rates for the given device
+    /// </summary>
+    /// <returns>enumerable of baud rates</returns>
+    IEnumerable<int> EnumerateBaudRates();
 }
 
 }

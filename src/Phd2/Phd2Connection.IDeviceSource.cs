@@ -5,6 +5,7 @@ using Qkmaxware.Astro.Control.Devices;
 namespace Qkmaxware.Astro.Control {
 
 public partial class Phd2Connection : IDeviceSource {
+    public IEnumerable<IDevice> EnumerateAllDevices() => this.EnumerateAutoGuiders().Cast<IDevice>();
     /// <summary>
     /// List all camera that are available for control via this source
     /// </summary>

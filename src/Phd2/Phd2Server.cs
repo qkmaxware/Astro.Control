@@ -42,23 +42,16 @@ public class Phd2Server : IServerSpecification {
         return success;
     }
 
-    /// <summary>
-    /// Try to establish a connection to the PHD2 server
-    /// </summary>
-    /// <param name="conn">connection if successful</param>
-    /// <returns>true if connection was successful, false otherwise</returns>
-    public bool TryConnect(out IServerConnection conn) {
-        return TryConnect(out conn, null);
-    }
 
     /// <summary>
     /// Try to establish a connection to the PHD2 server
     /// </summary>
     /// <param name="conn">connection if successful</param>
-    /// <param name="events">event listeners</param>
+    /// <param name="logger">logger for connection messages</param>
     /// <returns>true if connection was successful, false otherwise</returns>
-    public bool TryConnect(out IServerConnection conn, Phd2ConnectionEventDispatcher events) {
-        conn = new Phd2Connection(this, events);
+    public bool TryConnect(out IServerConnection conn, IConnectionLogger logger = null) {
+        conn = new Phd2Connection(this, null);
+        conn.InputLogger = logger;
         conn.Connect();
         if (conn.IsConnected) {
             return true;

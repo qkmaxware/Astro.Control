@@ -20,7 +20,7 @@ public interface IServerSpecification {
     /// </summary>
     /// <param name="connection">connection if successful</param>
     /// <returns>true if connection was successful</returns>
-    bool TryConnect(out IServerConnection connection);
+    bool TryConnect(out IServerConnection connection, IConnectionLogger logger = null);
 }
 
 }

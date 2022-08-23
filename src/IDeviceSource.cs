@@ -8,6 +8,11 @@ namespace Qkmaxware.Astro.Control {
 /// </summary>
 public interface IDeviceSource {
     /// <summary>
+    /// Enumerable of all devices available on the source
+    /// </summary>
+    /// <returns>enumerable of all devices</returns>
+    IEnumerable<IDevice> EnumerateAllDevices();
+    /// <summary>
     /// List all camera that are available for control via this source
     /// </summary>
     /// <returns>enumerable of cameras</returns>

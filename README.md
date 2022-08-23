@@ -4,6 +4,8 @@ C# client library for control of astronomical equipment using remote protocols f
 - [Astro.Control](#astrocontrol)
   - [INDI](#indi)
     - [Basic Usage](#basic-usage)
+    - [Example](#example)
+      - [Satellite Tracking](#satellite-tracking)
   - [PHD2](#phd2)
     - [Basic Usage](#basic-usage-1)
 
@@ -62,11 +64,62 @@ if (server.TryConnect(out conn)) {
         telescope.StartRotating(Direction.North);
     }
 ```
+### Example
+#### Satellite Tracking
+```cs
+// Connect to the server
+var server = new IndiServer("localhost");
+IndiConnection conn;
+if (!server.TryConnect(out conn)) {
+    throw new Exception("Failed to connect to the INDI server");
+}
+
+// Wait for device to be received by the client
+var driver = "Telescope Simulator";
+var device = conn.Devices.GetDeviceByNameOrNull(driver);
+var retries = 10;
+while (retries > 0 && device == null) {
+    Thread.Sleep(TimeSpan.FromSeconds(0.5));
+    device = conn.Devices.GetDeviceByNameOrNull(driver);
+    retries--;
+}
+if (device == null) {
+    throw new Exception("Could not find device driver");
+}
+
+// Make sure it is connected
+retries = 10;
+while (retries > 0 && !device.IsConnected) {
+    device.Connect();
+    Thread.Sleep(TimeSpan.FromSeconds(0.5));
+    retries--;
+}
+if (!device.IsConnected) {
+    throw new Exception("Failed to connect device driver");
+}
+
+// Use satellite ephemeris to compute ra & dec relative to observer (another library)
+Angle ra = ...;
+Angle dec = ...;
+
+// Tell the telescope to track the coordinates
+var controller = new IndiTelescopeController(device);
+controller.Track(ra: ra, dec: dec, rate: TrackingRate.Sidereal);
+
+// Satellites are fast, optionally recompute the RA and DEC and goto the new coordinates
+var tracking = true;
+while (tracking) {
+    Thread.Sleep(TimeSpan.FromSeconds(1));
+    ra = ...;
+    dec = ...;
+    controller.Track(ra: ra, dec: dec, rate: TrackingRate.Sidereal);
+}
+```
 
 ## PHD2
 ![](https://openphdguiding.org/wp-content/themes/openphd/images/header.png)
 
-[PHD2](https://openphdguiding.org/) (Press Here Dummy) is a telescope guiding software for providing small and continuous adjustments to telescope mounts in order to keep a target imaging area as stable as possible for longer exposure imaging. It is known for its simplicity and ease of use. PHD2 includes a server mode and uses a JSON schema to communicate with a client library such as this one.
+[PHD2](https://openphdguiding.org/) is a telescope guiding software for providing small and continuous adjustments to telescope mounts in order to keep a target imaging area as stable as possible for longer exposure imaging. It is known for its simplicity and ease of use. PHD2 includes a server mode and uses a JSON schema to communicate with a client library such as this one.
 
 ### Basic Usage
 1. Connect to the PHD2 server
@@ -79,7 +132,10 @@ if (server.TryConnect(out conn)) {
 ```
 2. Configure connection and assign event listeners (optional)
 ```cs
-    conn.Events.OnOnAppStateChanged += (state) => { ... };
+    conn.Events.OnAppStateChanged += (state) => { ... };
     // ...
 ```
-3. 
+3. Call RPC methods to interact with the PHD2 server
+```cs
+    conn.Guide();
+```

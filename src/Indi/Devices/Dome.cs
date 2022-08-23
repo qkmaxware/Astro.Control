@@ -30,7 +30,7 @@ public class IndiDomeController : IndiDeviceController, IDome {
     /// </summary>
     public void OpenShutter() {
         var vec = GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("DOME_SHUTTER");
-        vec.SwitchTo("SHUTTER_OPEN");
+        vec?.SwitchTo("SHUTTER_OPEN");
         SetProperty(vec);
     }
     /// <summary>
@@ -38,7 +38,7 @@ public class IndiDomeController : IndiDeviceController, IDome {
     /// </summary>
     public void CloseShutter() {
         var vec = GetPropertyOrDefault<IndiVector<IndiSwitchValue>>("DOME_SHUTTER");
-        vec.SwitchTo("SHUTTER_CLOSE");
+        vec?.SwitchTo("SHUTTER_CLOSE");
         SetProperty(vec);
     }
 
@@ -47,7 +47,9 @@ public class IndiDomeController : IndiDeviceController, IDome {
     /// </summary>
     /// <param name="rpm">rotational speed in Revolutions Per Minute</param>
     public void SetSpeed(double rpm) {
-        var vec = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>("DOME_SPEED");
+        var vec = this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>("DOME_SPEED");
+        if (vec == null)
+            return;
         var val = vec.GetItemWithName("DOME_SPEED_VALUE");
         if (val != null) {
             val.Value = rpm;
@@ -56,13 +58,25 @@ public class IndiDomeController : IndiDeviceController, IDome {
     }
 
     /// <summary>
+    /// The current direction the dome is pointing
+    /// </summary>
+    /// <value>direction</value>
+    public Angle PointingDirection {
+        get {
+            var vec = this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>("ABS_DOME_POSITION");
+            var pos = vec?.GetItemWithName("DOME_ABSOLUTE_POSITION");
+            return Angle.Degrees(pos?.Value ?? 0);
+        }
+    }
+
+    /// <summary>
     /// Move the dome to the given azimuthal angle
     /// </summary>
     /// <param name="rpm">rotations per minute</param>
     /// <param name="angle">current rotation angle</param>
     public void Goto(double rpm, Angle angle) {
-        var vec = this.GetPropertyOrThrow<IndiVector<IndiNumberValue>>("ABS_DOME_POSITION");
-        var pos = vec.GetItemWithName("DOME_ABSOLUTE_POSITION");
+        var vec = this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>("ABS_DOME_POSITION");
+        var pos = vec?.GetItemWithName("DOME_ABSOLUTE_POSITION");
         if (pos != null) {
             this.SetSpeed(rpm);
             pos.Value = (double)angle.TotalDegrees();

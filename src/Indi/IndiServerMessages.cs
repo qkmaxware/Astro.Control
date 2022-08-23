@@ -67,11 +67,11 @@ public class IndiSetPropertyMessage : IndiServerMessage {
         */
         if (string.IsNullOrEmpty(DeviceName)) {
             // Set property for all devices
-            foreach (var device in connection.Devices) {
-                updateProperty(device.Value, PropertyName, PropertyValue);
+            foreach (var device in connection.Devices.AllDevices()) {
+                updateProperty(device, PropertyName, PropertyValue);
             }
         } else {
-            var device = connection.GetDeviceByName(DeviceName);
+            var device = connection.Devices.GetDeviceByNameOrNull(DeviceName);
             if (device != null) {
                 // Set property on specific device
                 updateProperty(device, PropertyName, PropertyValue);
@@ -82,14 +82,8 @@ public class IndiSetPropertyMessage : IndiServerMessage {
     private void updateProperty(IndiDevice device, string property, IndiValue value) {
         // TODO, fix this to not overwrite values, but just to update the actual "stored" value
         if (device.Properties.Exists(PropertyName)) {
-            var oldProp = device.Properties[property];
-            if (oldProp is UpdatableIndiValue updatableProp) {
-                if (!updatableProp.TryUpdateValue(value)) {
-                    device.Properties[property] = PropertyValue;
-                }
-            } else {
-                device.Properties[property] = PropertyValue;
-            }
+            var oldProp = device.Properties.GetValueOrNull(property);
+            device.Properties.SetLocalValue(property, value);
         } else {
             // Do nothing, SET does not make new properties, just updates existing ones
         }
@@ -137,7 +131,7 @@ public class IndiDefinePropertyMessage : IndiServerMessage {
         */
         if (!string.IsNullOrEmpty(this.DeviceName) && !string.IsNullOrEmpty(this.PropertyName) && this.PropertyValue != null) {
             var device = connection.GetOrCreateDevice(this.DeviceName);
-            device.Properties[this.PropertyName] = this.PropertyValue;
+            device.Properties.SetLocalValue(this.PropertyName, this.PropertyValue);
         }
     }
 
@@ -199,22 +193,22 @@ public class IndiDeletePropertyMessage : IndiServerMessage {
         if (string.IsNullOrEmpty(DeviceName)) {
             // Delete property for all devices
             if (DeleteAllProperties) {
-                foreach (var device in connection.Devices) {
-                    device.Value.Properties.Clear();
+                foreach (var device in connection.Devices.AllDevices()) {
+                    device.Properties.ClearLocalValues();
                 }
             } else {
-                foreach (var device in connection.Devices) {
-                    device.Value.Properties.Delete(this.PropertyName);
+                foreach (var device in connection.Devices.AllDevices()) {
+                    device.Properties.DeleteLocalValue(this.PropertyName);
                 }
             }
         } else {
-            var device = connection.GetDeviceByName(DeviceName);
+            var device = connection.Devices.GetDeviceByNameOrNull(DeviceName);
             if (device != null) {
                 // Delete property on specific device
                 if (DeleteAllProperties) {
-                    device.Properties.Clear();
+                    device.Properties.ClearLocalValues();
                 } else {
-                    device.Properties.Delete(this.PropertyName);
+                    device.Properties.DeleteLocalValue(this.PropertyName);
                 }
             }
         }

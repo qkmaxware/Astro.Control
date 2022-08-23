@@ -57,39 +57,15 @@ public abstract class IndiValue {
 }
 
 /// <summary>
-/// Base class for INDI values whose values can be updated from other values
-/// </summary>
-public abstract class UpdatableIndiValue : IndiValue {
-    /// <summary>
-    /// Try to update this value from another value
-    /// </summary>
-    /// <param name="value">value to copy</param>
-    /// <returns>true if update was successful</returns>
-    public abstract bool TryUpdateValue(IndiValue value);
-}
-
-/// <summary>
 /// Base class for INDI values that encapsulate a primitive type
 /// </summary>
 /// <typeparam name="T">primitive type</typeparam>
-public abstract class IndiValue<T> : UpdatableIndiValue {
+public abstract class IndiValue<T> : IndiValue {
     /// <summary>
     /// Stored primitive type
     /// </summary>
     /// <value>value</value>
     public virtual T Value { get; set; }
-
-    public override bool TryUpdateValue(IndiValue from) {
-        if (from != null && from is IndiValue<T> valueType) {
-            this.UpdateValue(valueType);
-            return true;
-        } else {
-            return false;
-        }
-    }
-    public virtual void UpdateValue(IndiValue<T> from) {
-        this.Value = from.Value;
-    }
 }
 
 /// <summary>
@@ -190,6 +166,8 @@ public class IndiLightValue : IndiValue {
 public class IndiBlobValue : IndiValue<string> {
     public byte[] Blob => Convert.FromBase64String(this.Value);
     public override string IndiTypeName => "BLOB";
+
+    public bool HasData => !string.IsNullOrEmpty(this.Value);
     public IndiBlobValue() {}
     public IndiBlobValue(FileStream fs) {
         using (BinaryReader reader = new BinaryReader(fs)) {
@@ -234,7 +212,7 @@ public class IndiBlobValue : IndiValue<string> {
 /// Vector containing other INDI values
 /// </summary>
 /// <typeparam name="T">INDI value type</typeparam>
-public class IndiVector<T> : UpdatableIndiValue, IList<T> where T:IndiValue {
+public class IndiVector<T> : IndiValue, IList<T> where T:IndiValue {
     /// <summary>
     /// Group associated with the vector
     /// </summary>
@@ -422,36 +400,8 @@ public class IndiVector<T> : UpdatableIndiValue, IList<T> where T:IndiValue {
         return parent;
     }
 
-    /// <summary>
-    /// Try to update the values of this vector from another vector
-    /// </summary>
-    /// <param name="value">indi values to draw from</param>
-    /// <returns>true if indi value is a compatible type vector</returns>
-    public override bool TryUpdateValue(IndiValue value) {
-        if (value != null && value is IndiVector<T> vec) {
-            var updates = vec.vector;
-            List<T> newVector = new List<T>(vector.Count);
-            foreach (var update in updates) {
-                // Access existing property
-                var existingProperty = vector.Where(prop => prop.Name == update.Name).FirstOrDefault();
-                if (existingProperty != null && existingProperty is UpdatableIndiValue updatableProperty) {
-                    if (updatableProperty.TryUpdateValue(update)) {
-                        // Updated existing property, add back to the list
-                        newVector.Add(existingProperty);
-                    } else {
-                        // Failed to update existing property, add the new value as raw
-                        newVector.Add(update);
-                    }
-                } else {
-                    // No previous property, add new value as raw
-                    newVector.Add(update);
-                }
-            }
-            this.vector = newVector;
-            return true;
-        } else {
-            return false;
-        }
+    public override string ToString() {
+        return "[" + string.Join(',', this.vector) + "]";
     }
 }
 
