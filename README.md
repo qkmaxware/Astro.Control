@@ -8,6 +8,8 @@ C# client library for control of astronomical equipment using remote protocols f
       - [Satellite Tracking](#satellite-tracking)
   - [PHD2](#phd2)
     - [Basic Usage](#basic-usage-1)
+  - [ASCOM Alpaca](#ascom-alpaca)
+    - [Basic Usage](#basic-usage-2)
 
 ## INDI
 ![](https://indilib.org/templates/rt_antares/custom/images/logo/indi_logo.png)
@@ -138,4 +140,19 @@ if (server.TryConnect(out conn)) {
 3. Call RPC methods to interact with the PHD2 server
 ```cs
     conn.Guide();
+```
+
+## ASCOM Alpaca
+![](https://www.ascom-standards.org/Images/AlpacaLogo210.png)
+
+[ASCOM Alpaca](https://www.ascom-standards.org/Developer/Alpaca.htm) is a rest based service used for cross platform control and monitoring of devices controlled via the ASCOM platform. 
+
+### Basic Usage
+1. Connect to the Alpaca server
+```cs
+var server = new AscomAlpacaServer("localhost");
+AscomAlpacaConnection conn;
+if (server.TryConnect(out conn)) {
+    // ...
+}
 ```
