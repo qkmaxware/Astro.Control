@@ -1,3 +1,7 @@
+using System.Runtime.Serialization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace Qkmaxware.Astro.Control {
 
 public class AlpacaResponse {
@@ -21,5 +25,34 @@ public class AlpacaConfiguredDevicesResponse : AlpacaValueResponse<AlpacaConfigu
     }
 }
 public class AlpacaMethodResponse : AlpacaResponse {}
+
+public enum AlpacaImageSampleDataType {
+    Unknown = 0,
+    I16 = 1,
+    I32 = 2,
+    F64 = 3,
+}
+
+public class AlpacaImageArrayResponse : AlpacaResponse, IJsonOnDeserialized {
+    public AlpacaImageSampleDataType Type {get; set;}
+    public int Rank {get; set;}
+    public JsonDocument Value {get; set;}
+
+    public bool HasMonochromeData => MonochromePixels != null;
+    public double[][] MonochromePixels {get; set;}
+    public bool HasColourData => ColourPixels != null;
+    public double[][][] ColourPixels {get; set;}
+
+    [OnDeserialized]
+    public void OnDeserialized () {
+        if (Rank == 3) {
+            MonochromePixels = null;
+            ColourPixels = JsonSerializer.Deserialize<double[][][]>(Value);
+        } else {
+            MonochromePixels = JsonSerializer.Deserialize<double[][]>(Value);
+            ColourPixels = null;
+        }
+    }
+}
 
 }

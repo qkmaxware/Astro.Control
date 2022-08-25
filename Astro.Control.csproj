@@ -22,7 +22,7 @@
 
   <ItemGroup>
     <PackageReference Include="Qkmaxware.Astro.Measurement" Version="1.0.1" />
-    <PackageReference Include="System.Text.Json" Version="5.0.2" />
+    <PackageReference Include="System.Text.Json" Version="6.0.5" />
   </ItemGroup>
 
 </Project>
