@@ -151,8 +151,16 @@ if (server.TryConnect(out conn)) {
 1. Connect to the Alpaca server
 ```cs
 var server = new AscomAlpacaServer("localhost");
-AscomAlpacaConnection conn;
+AlpacaConnection conn;
 if (server.TryConnect(out conn)) {
     // ...
 }
+```
+2. Obtain device
+```cs
+var telescope = conn.EnumerateTelescopes().First();
+```
+3. Send remote control commands
+```cs
+telescope.Track(ra: Angle.Hours(0), dec: Angle.Degrees(41), TrackingRate.Sidereal);
 ```

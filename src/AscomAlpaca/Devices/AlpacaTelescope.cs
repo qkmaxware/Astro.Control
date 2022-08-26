@@ -37,7 +37,6 @@ public class AlpacaTelescope : AlpacaDevice, ITelescope {
             new KeyValuePair<string,string>("Axis", "1"),
             new KeyValuePair<string,string>("Rate", vertical),
         );
-        throw new System.NotImplementedException();
     }
 
     public void Sync(Angle ra, Angle dec) {
@@ -61,6 +60,7 @@ public class AlpacaTelescope : AlpacaDevice, ITelescope {
             $"{Connection.Server.Host}:{Connection.Server.Port}/telescope/{DeviceNumber}/tracking",
             new KeyValuePair<string,string>("Tracking", false.ToString())
         );
+        // TODO goto rate
         Put<AlpacaMethodResponse>(
             $"{Connection.Server.Host}:{Connection.Server.Port}/telescope/{DeviceNumber}/slewtotargetasync"
         );
@@ -78,6 +78,7 @@ public class AlpacaTelescope : AlpacaDevice, ITelescope {
         Put<AlpacaMethodResponse>(
             $"{Connection.Server.Host}:{Connection.Server.Port}/telescope/{DeviceNumber}/slewtotargetasync"
         );
+        // TODO tracking rate
         Put<AlpacaMethodResponse>(
             $"{Connection.Server.Host}:{Connection.Server.Port}/telescope/{DeviceNumber}/tracking",
             new KeyValuePair<string,string>("Tracking", true.ToString())
