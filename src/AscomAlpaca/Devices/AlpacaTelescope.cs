@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using Qkmaxware.Measurement;
 
 namespace Qkmaxware.Astro.Control.Devices {
@@ -30,12 +32,12 @@ public class AlpacaTelescope : AlpacaDevice, ITelescope {
         Put<AlpacaMethodResponse>(
             $"{Connection.Server.Host}:{Connection.Server.Port}/telescope/{DeviceNumber}/moveaxis",
             new KeyValuePair<string,string>("Axis", "0"),
-            new KeyValuePair<string,string>("Rate", horizontal),
+            new KeyValuePair<string,string>("Rate", horizontal.ToString())
         );
         Put<AlpacaMethodResponse>(
             $"{Connection.Server.Host}:{Connection.Server.Port}/telescope/{DeviceNumber}/moveaxis",
             new KeyValuePair<string,string>("Axis", "1"),
-            new KeyValuePair<string,string>("Rate", vertical),
+            new KeyValuePair<string,string>("Rate", vertical.ToString())
         );
     }
 
@@ -43,7 +45,7 @@ public class AlpacaTelescope : AlpacaDevice, ITelescope {
         Put<AlpacaMethodResponse>(
             $"{Connection.Server.Host}:{Connection.Server.Port}/telescope/{DeviceNumber}/synctocoordinates",
             new KeyValuePair<string,string>("RightAscension", ((double)ra.TotalHours()).ToString()),
-            new KeyValuePair<string,string>("Declination", ((double)dec.TotalDegrees()).ToString()),
+            new KeyValuePair<string,string>("Declination", ((double)dec.TotalDegrees()).ToString())
         );
     }
 
