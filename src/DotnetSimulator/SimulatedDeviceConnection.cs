@@ -8,17 +8,7 @@ namespace Qkmaxware.Astro.Control {
 /// <summary>
 /// Simulated device source with a simulated connection to the source
 /// </summary>
-public class SimulatedDeviceSource : IServerSpecification, IServerConnection, IDeviceSource {
-    #region Fake Host
-    public string Host => "localhost";
-    public int Port => 0;
-    public bool TryConnect(out IServerConnection connection, IConnectionLogger logger = null) {
-        connection = this;
-        this.Connect();
-        this.InputLogger = logger;
-        return true;
-    }
-    #endregion
+public class SimulatedDeviceConnection : IServerConnection, IDeviceSource {
 
     #region Fake Connection
 
