@@ -26,6 +26,18 @@ public interface ITelescope : IDevice {
     Angle Declination {get;}
 
     /// <summary>
+    /// Check if the telescope is slewing to a target
+    /// </summary>
+    /// <value>true if the telescope is slewing</value>
+    bool IsSlewing {get;}
+
+    /// <summary>
+    /// Check if the telescope is tracking a target
+    /// </summary>
+    /// <value>true if the telescope is tracking</value>
+    bool IsTracking {get;}
+
+    /// <summary>
     /// Begin rotating the telescope in the desired direction
     /// </summary>
     /// <param name="horizontal">horizontal axis input</param>

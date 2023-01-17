@@ -24,6 +24,9 @@ public class AlpacaTelescope : AlpacaDevice, ITelescope {
         }
     }
 
+    public bool IsSlewing => Get<AlpacaValueResponse<bool>>($"{Connection.Server.Host}:{Connection.Server.Port}/telescope/{DeviceNumber}/slewing").Value;
+    public bool IsTracking => Get<AlpacaValueResponse<bool>>($"{Connection.Server.Host}:{Connection.Server.Port}/telescope/{DeviceNumber}/tracking").Value;
+
 
     public void Rotate(float horizontal, float vertical) {
         Put<AlpacaMethodResponse>(

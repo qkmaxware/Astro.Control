@@ -22,9 +22,12 @@ public class IndiTelescopeController : IndiDeviceController, ITelescope {
     /// <returns></returns>
     public Angle Declination => Angle.Degrees(this.GetPropertyOrDefault<IndiVector<IndiNumberValue>>(IndiStandardProperties.TelescopeJNowEquatorialCoordinate)?.GetItemWithName("DEC")?.Value ?? 0);
 
+    public bool IsSlewing => GetPropertyOrDefault<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeStatus)?.IsOn("SCOPE_SLEWING") ?? false;
+    public bool IsTracking => GetPropertyOrDefault<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeStatus)?.IsOn("SCOPE_TRACKING") ?? false;
+
     private string mode;
     private void setMode(string mode) {
-        var vector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeOnCoordinateSet);;
+        var vector = GetPropertyOrThrow<IndiVector<IndiSwitchValue>>(IndiStandardProperties.TelescopeOnCoordinateSet);
         this.mode = mode;
         vector.SwitchTo((toggle) => toggle.Name == mode);
         SetProperty("ON_COORD_SET", vector);
@@ -42,7 +45,7 @@ public class IndiTelescopeController : IndiDeviceController, ITelescope {
             setMode("SYNC");
     }
 
-    private bool J2000;
+    private bool J2000 = true;
     public void UseJNowCoordinates(bool jnow) {
         J2000 = !jnow;
     }

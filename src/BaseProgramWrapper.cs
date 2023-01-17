@@ -20,8 +20,8 @@ public abstract class BaseProgramWrapper {
     /// <param name="command">command to execute</param>
     /// <param name="stdout">results of standard output</param>
     /// <param name="stderr">results of standard error</param>
-    /// <returns>true if command executed with no errors</returns>
-    protected bool TryExecuteCommand(string directory, string command, string[] args, out string stdout, out string stderr) {
+    /// <returns>command return code or -1 if there was an exception</returns>
+    protected int TryExecuteCommand(string directory, string command, string[] args, out string stdout, out string stderr) {
         try {
             Process cmd = new Process();
             cmd.StartInfo.FileName = command;
@@ -42,14 +42,11 @@ public abstract class BaseProgramWrapper {
             stdout = cmd.StandardOutput.ReadToEnd();
             stderr = cmd.StandardError.ReadToEnd();
 
-            if (stderr.Length > 0)
-                return false;
-            else 
-                return true;
+            return cmd.ExitCode;
         } catch (Exception e) {
             stdout = string.Empty;
             stderr = e.Message;
-            return false;
+            return -1;
         }
     }
 }

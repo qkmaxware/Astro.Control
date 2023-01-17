@@ -34,6 +34,7 @@ public static class IndiStandardProperties {
     public static readonly string TelescopeTrackRate = "TELESCOPE_TRACK_RATE";
     public static readonly string TelescopeInfo = "TELESCOPE_INFO";
     public static readonly string TelescopePierSide = "TELESCOPE_PIER_SIDE";
+    public static readonly string TelescopeStatus = "TELESCOPE_STATUS";
 
     // CCDs
     public static readonly string CcdExposure = "CCD_EXPOSURE";

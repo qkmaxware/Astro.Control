@@ -30,6 +30,9 @@ public class SimulatedTelescope : ITelescope {
     /// <returns></returns>
     public Angle Declination => dec;
 
+    public bool IsSlewing => false;
+    public bool IsTracking => false;
+
     private Angle ra = Angle.Zero;
     private Angle dec = Angle.Zero;
 

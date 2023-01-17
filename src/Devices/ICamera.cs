@@ -19,12 +19,12 @@ public class Binning {
     private int _h;
     public int Horizontal {
         get => _h; 
-        set => _h = Math.Max(1, value); // Ensure positive non-zero
+        protected set => _h = Math.Max(1, value); // Ensure positive non-zero
     }
     private int _v;
     public int Vertical {
         get => _v; 
-        set => _v = Math.Max(1, value); // Ensure positive non-zero
+        protected set => _v = Math.Max(1, value); // Ensure positive non-zero
     }
     public Binning() {
         this.Horizontal = 1;
@@ -34,6 +34,27 @@ public class Binning {
         this.Horizontal = horizontal;
         this.Vertical = vertical;
     }
+
+    /// <summary>
+    /// 1x1 binning or "no" binning
+    /// </summary>
+    public static readonly Binning None = new Binning(1, 1);
+    /// <summary>
+    /// 2x2 binning
+    /// </summary>
+    public static readonly Binning X2 = new Binning(2, 2);
+    /// <summary>
+    /// 3x3 binning
+    /// </summary>
+    public static readonly Binning X3 = new Binning(3, 3);
+    /// <summary>
+    /// 4x4 binning
+    /// </summary>
+    public static readonly Binning X4 = new Binning(4, 4);
+    /// <summary>
+    /// 5x5 binning
+    /// </summary>
+    public static readonly Binning X5 = new Binning(5, 5);
 }
 
 /// <summary>
